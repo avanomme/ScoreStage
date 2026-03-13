@@ -1,0 +1,1 @@
+# /review — Read-Only Review\n\n## Purpose\nProvide a structured review (security, performance, maintainability) without editing files.\n\n## Guardrails\n- No patches. Suggestions only.\n

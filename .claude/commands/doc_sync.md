@@ -1,0 +1,1 @@
+# /doc_sync — Keep Docs In Sync\n\n## Purpose\nUpdate docs/internal/* and any architecture docs to match current reality.\n\n## Guardrails\n- Prefer updating docs based on code + tasks; do not rewrite product requirements.\n

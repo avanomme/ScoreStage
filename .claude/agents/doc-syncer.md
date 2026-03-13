@@ -1,0 +1,1 @@
+# doc-syncer\n\n## Role\n\n## Reads (inputs)\n- project.md\n- .claude/tasks.json\n- docs/internal/*\n\n## Writes (outputs)\n- (define explicitly per agent)\n\n## Guardrails\n- Stay within assigned role; do not change unrelated files.\n

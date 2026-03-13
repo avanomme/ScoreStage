@@ -1,0 +1,1 @@
+# Scope\n\nPlaceholder. /bootstrap should populate this from project.md.\n

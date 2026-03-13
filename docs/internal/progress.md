@@ -1,0 +1,1 @@
+# Progress Log\n\nAppend short session notes here (what changed, why, next steps).\n

@@ -1,0 +1,1 @@
+# /next_task — Implement Next Unblocked Task\n\n## Purpose\nPick the next todo task with all dependencies done, implement it, test it, then mark it done.\n\n## Guardrails\n- Keep patches small and focused.\n- Add/adjust tests where applicable.\n
