@@ -41,7 +41,7 @@ public struct PremiumButton: View {
             .background(backgroundColor)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PremiumButtonPressStyle())
     }
 
     private var foregroundColor: Color {
@@ -58,6 +58,15 @@ public struct PremiumButton: View {
         case .secondary: AnyShapeStyle(ASColors.accentFallback.opacity(0.12))
         case .ghost: AnyShapeStyle(Color.clear)
         }
+    }
+}
+
+struct PremiumButtonPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

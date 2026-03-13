@@ -12,6 +12,7 @@ public struct GlassCard<Content: View>: View {
             .padding(ASSpacing.cardPadding)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous))
+            .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
     }
 }
 

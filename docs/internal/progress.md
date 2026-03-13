@@ -48,3 +48,31 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - Begin Phase 1: Premium PDF Reader MVP
 - Run `/next_phase` to start implementing Phase 1
+
+---
+
+## 2026-03-13 — Phase 1: Premium PDF Reader MVP Complete
+
+**What changed:**
+- Built ScoreImportService with SHA256 dedup, metadata extraction from filename, PDF page count (P1-001)
+- Created ScoreMetadataEditor with full field editing and TagsEditor (P1-002)
+- Built LibraryHomeView with grid/list toggle, search, sort (5 modes), favorites filter, context menus (P1-003)
+- Built CollectionsBrowserView for tags/composers/genres browsing (P1-004)
+- Built ScoreDetailView with header, metadata card, tags FlowLayout, assets, actions (P1-005)
+- Built PDFRenderService with NSCache (10 pages), CGContext rendering, prefetch (P1-006)
+- Built ScoreReaderView with 4 display modes: single, horizontal, vertical, two-page spread (P1-007)
+- Built PerformanceModeView with auto-hiding controls, large tap zones (P1-008)
+- Built AnnotationToolbarView with 6 tools, color palette, line width, opacity, undo/redo (P1-009)
+- Built AnnotationCanvasView with SwiftUI Canvas + DragGesture drawing (P1-010)
+- Built SetlistListView with create, duplicate, delete (P1-011)
+- Built SetlistDetailView with reorder, add scores sheet (P1-012)
+- Built BookmarksPanel with add/delete, page jump (P1-013)
+- Created CloudKitSyncService stub with SyncState enum (P1-014)
+- Built PageTurnService and ReaderKeyboardShortcuts (P1-015, P1-016)
+- Built SettingsView with display, page turning, sync, storage sections (P1-017)
+- Added UI polish: entrance animations, hover effects, press animations, transitions (P1-018)
+- Created wiki docs (9 pages) in docs/wiki/ (P1-019)
+- Renamed entire project from AureliaScore to ScoreStage
+
+**Next steps:**
+- Begin Phase 2: Advanced Annotation + Device Sync

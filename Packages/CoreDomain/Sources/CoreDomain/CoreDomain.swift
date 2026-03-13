@@ -1,4 +1,4 @@
-// CoreDomain — shared data models and protocols for Aurelia Score
+// CoreDomain — shared data models and protocols for ScoreStage
 // This package contains SwiftData models and domain types used across all features.
 
 import Foundation

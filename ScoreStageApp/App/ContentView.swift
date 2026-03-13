@@ -1,5 +1,8 @@
 import SwiftUI
 import DesignSystem
+import LibraryFeature
+import SetlistFeature
+import CoreDomain
 
 enum AppTab: String, CaseIterable, Identifiable {
     case library
@@ -60,7 +63,7 @@ struct ContentView: View {
                 Label(tab.title, systemImage: tab.icon)
                     .tag(tab)
             }
-            .navigationTitle("Aurelia Score")
+            .navigationTitle("ScoreStage")
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
             NavigationStack {
@@ -74,52 +77,15 @@ struct ContentView: View {
     private func tabContent(for tab: AppTab) -> some View {
         switch tab {
         case .library:
-            LibraryPlaceholderView()
+            LibraryHomeView()
         case .setlists:
-            SetlistsPlaceholderView()
+            SetlistListView()
+                .navigationDestination(for: SetList.self) { setlist in
+                    SetlistDetailView(setlist: setlist)
+                }
         case .settings:
-            SettingsPlaceholderView()
+            SettingsView()
         }
-    }
-}
-
-// MARK: - Placeholder Views (to be replaced by feature modules)
-
-struct LibraryPlaceholderView: View {
-    var body: some View {
-        EmptyStateView(
-            icon: "music.note.list",
-            title: "No Scores Yet",
-            message: "Import your sheet music to get started.",
-            actionTitle: "Import Score"
-        ) {}
-        .navigationTitle("Library")
-    }
-}
-
-struct SetlistsPlaceholderView: View {
-    var body: some View {
-        EmptyStateView(
-            icon: "list.bullet.rectangle",
-            title: "No Setlists",
-            message: "Create a setlist to organize your performances."
-        )
-        .navigationTitle("Setlists")
-    }
-}
-
-struct SettingsPlaceholderView: View {
-    var body: some View {
-        Form {
-            Section("General") {
-                Text("Settings will appear here")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("Settings")
-        #if os(macOS)
-        .formStyle(.grouped)
-        #endif
     }
 }
 

@@ -1,4 +1,4 @@
-# Scope — Aurelia Score (ScoreStage)
+# Scope — ScoreStage
 
 A premium Apple-native sheet music app for iOS, iPadOS, and macOS targeting serious musicians. Combines the best of forScore (library/annotation), MobileSheets (setlists/performance), and MuseScore (playback/notation intelligence).
 

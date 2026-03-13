@@ -1,6 +1,6 @@
 import XCTest
 
-final class AureliaScoreTests: XCTestCase {
+final class ScoreStageTests: XCTestCase {
     func testAppLaunches() {
         XCTAssertTrue(true, "Placeholder: app scaffolding exists")
     }

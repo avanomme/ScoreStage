@@ -3,7 +3,7 @@ import SwiftData
 import CoreDomain
 
 @main
-struct AureliaScoreApp: App {
+struct ScoreStageApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

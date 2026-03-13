@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Aurelia Score</string>
+	<string>ScoreStage</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -37,8 +37,8 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Aurelia Score uses the camera for hands-free page turning via head or eye tracking.</string>
+	<string>ScoreStage uses the camera for hands-free page turning via head or eye tracking.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Aurelia Score uses the microphone for score-following during practice.</string>
+	<string>ScoreStage uses the microphone for score-following during practice.</string>
 </dict>
 </plist>
