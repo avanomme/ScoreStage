@@ -1,0 +1,813 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0798B787F2F4BF4F9AF4BE67 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 830F91C9ABAC86DA297519C7 /* Assets.xcassets */; };
+		096E5E1E6FF0A3A4B52F6E91 /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 3834CE157D10CB243DC75319 /* SetlistFeature */; };
+		0B4CBE49407CC0EFA0A429FB /* AureliaScoreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 963923AFF75F49080D7C0B07 /* AureliaScoreApp.swift */; };
+		0DAD989FE6FD43F3977231C0 /* DeviceLinkFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 5A02377C4B9209C9E742F8F6 /* DeviceLinkFeature */; };
+		131D5CBAA5F8D888F4846D0A /* AureliaScoreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 963923AFF75F49080D7C0B07 /* AureliaScoreApp.swift */; };
+		216EE0B25B4D0D7F3DD0E3B8 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED51D6D94D3024AA19E9B99 /* ContentView.swift */; };
+		219F07971FD0F5833E07FCD7 /* AureliaScoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8706A16871B3242979261D /* AureliaScoreTests.swift */; };
+		2EEC2E26F5A191D452E1439A /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = D1C16CBAB747DE7E5900455A /* SetlistFeature */; };
+		2F3D32925A1141AEC0254CBF /* AnnotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = FAB9480F28E4F3E3F70C4335 /* AnnotationFeature */; };
+		396FAA046924CF75F74D3ED7 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 40E212FA2ABDA0E1A2607EC7 /* LibraryFeature */; };
+		41D6FC2B5D16B33758106756 /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = CDF782D1484685F07C2B733C /* CoreDomain */; };
+		624E4C1629DAF671F3336D9A /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = E8CC74281AE6A4BF33E58B80 /* DesignSystem */; };
+		662D7F37B718C3DBE19C40AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 830F91C9ABAC86DA297519C7 /* Assets.xcassets */; };
+		68DEAD0845E5DC6524682056 /* PlaybackFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 1D7649225098A1F0E2852A39 /* PlaybackFeature */; };
+		6C91A2580330708EB2929508 /* PlaybackFeature in Frameworks */ = {isa = PBXBuildFile; productRef = DAEFE11BC6F6AF207551C607 /* PlaybackFeature */; };
+		6CD4335325458B2C6A5B5001 /* NotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A2D4240B116D3BC3AEF9541E /* NotationFeature */; };
+		86921E8C173CAC9FB85CB9BB /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8EE7CE790F4FAE8EE8507FBB /* InputTrackingFeature */; };
+		88962BEF1E1F45D5BE3E87C9 /* DeviceLinkFeature in Frameworks */ = {isa = PBXBuildFile; productRef = B599F6A4CBC1853064E60446 /* DeviceLinkFeature */; };
+		8CCCD8F120BDD1510E3C4B45 /* NotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = B589F48B4ED24F9B7429291E /* NotationFeature */; };
+		8E9522460237127603565861 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 8CEE3F9439891559C9969D7A /* DesignSystem */; };
+		9A179E0A21A71D2A6A2CFE7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED51D6D94D3024AA19E9B99 /* ContentView.swift */; };
+		AE5F14CEBBC85A6B8379A1FA /* SyncFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 39B63756C8820AB0FA14EDCA /* SyncFeature */; };
+		B4BC06E0F09831A6B77F474A /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 9975C8D380DEAC861A0F7637 /* CoreDomain */; };
+		C315C71126B9DBC8C755493E /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = FC1FF2C3C2259E11A944B346 /* CoreDomain */; };
+		C3A5D24336A83658D633546B /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 7D0EDF429AB00F231C9BC430 /* LibraryFeature */; };
+		CAC96DAAA2B05A4610F56553 /* SyncFeature in Frameworks */ = {isa = PBXBuildFile; productRef = F5A8762E75BD355B5C3FF979 /* SyncFeature */; };
+		E33A19EDB41EC871ED42772C /* AnnotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = B7FCF06AEB71755D21501A79 /* AnnotationFeature */; };
+		EFDE3811D77F77BDEECE09FD /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 135A7B90EBD6DCAACDBA4DCC /* InputTrackingFeature */; };
+		F5D432917D3416DC72CA5777 /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 2BF5599B5071E4282120F034 /* ReaderFeature */; };
+		FC3E31C919F4B212210B661C /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 52ED9A50B7A75F5F2BE33576 /* ReaderFeature */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1F445029E5614B553A79C950 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0D6D6E02E9C957FBFFB057EF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 82E47064C8C4C68C3BE28CFE;
+			remoteInfo = "AureliaScore-iOS";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		16D42471858DEEB302FB538E /* AureliaScore-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "AureliaScore-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1E8706A16871B3242979261D /* AureliaScoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AureliaScoreTests.swift; sourceTree = "<group>"; };
+		201051452A43342E177925A1 /* DesignSystem */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DesignSystem; path = Packages/DesignSystem; sourceTree = SOURCE_ROOT; };
+		3087B67A1208CCD08835DD0C /* ReaderFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ReaderFeature; path = Packages/ReaderFeature; sourceTree = SOURCE_ROOT; };
+		39D33E963E6CEF21E780B8D1 /* InputTrackingFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = InputTrackingFeature; path = Packages/InputTrackingFeature; sourceTree = SOURCE_ROOT; };
+		4409606F4922601B8D932881 /* SetlistFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SetlistFeature; path = Packages/SetlistFeature; sourceTree = SOURCE_ROOT; };
+		6269342AF3F42338826892A4 /* LibraryFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LibraryFeature; path = Packages/LibraryFeature; sourceTree = SOURCE_ROOT; };
+		65EE0E193D29CA5684ADA549 /* NotationFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NotationFeature; path = Packages/NotationFeature; sourceTree = SOURCE_ROOT; };
+		74E69DEE1727D0BE55A70526 /* SyncFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SyncFeature; path = Packages/SyncFeature; sourceTree = SOURCE_ROOT; };
+		830F91C9ABAC86DA297519C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		90A0988CDE3BE39C7F19F63F /* DeviceLinkFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DeviceLinkFeature; path = Packages/DeviceLinkFeature; sourceTree = SOURCE_ROOT; };
+		9396F15A5FAD2523054DACF4 /* PlaybackFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PlaybackFeature; path = Packages/PlaybackFeature; sourceTree = SOURCE_ROOT; };
+		963923AFF75F49080D7C0B07 /* AureliaScoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AureliaScoreApp.swift; sourceTree = "<group>"; };
+		A13029399F98F66F0F53B071 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A1B3CE5787BC6856C817F13B /* AnnotationFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AnnotationFeature; path = Packages/AnnotationFeature; sourceTree = SOURCE_ROOT; };
+		B97742AD229870CF197EE28A /* AureliaScoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AureliaScoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDD527922244918996275B8C /* AureliaScore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AureliaScore.entitlements; sourceTree = "<group>"; };
+		D054C29E3F56D92ECABBC0D4 /* AureliaScore-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AureliaScore-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EE20938063CE5FA53EC64C7A /* CoreDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreDomain; path = Packages/CoreDomain; sourceTree = SOURCE_ROOT; };
+		FED51D6D94D3024AA19E9B99 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BA6B016681B7ABA61823B5AE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41D6FC2B5D16B33758106756 /* CoreDomain in Frameworks */,
+				624E4C1629DAF671F3336D9A /* DesignSystem in Frameworks */,
+				396FAA046924CF75F74D3ED7 /* LibraryFeature in Frameworks */,
+				F5D432917D3416DC72CA5777 /* ReaderFeature in Frameworks */,
+				E33A19EDB41EC871ED42772C /* AnnotationFeature in Frameworks */,
+				68DEAD0845E5DC6524682056 /* PlaybackFeature in Frameworks */,
+				8CCCD8F120BDD1510E3C4B45 /* NotationFeature in Frameworks */,
+				CAC96DAAA2B05A4610F56553 /* SyncFeature in Frameworks */,
+				88962BEF1E1F45D5BE3E87C9 /* DeviceLinkFeature in Frameworks */,
+				096E5E1E6FF0A3A4B52F6E91 /* SetlistFeature in Frameworks */,
+				86921E8C173CAC9FB85CB9BB /* InputTrackingFeature in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD5BA919E4BF56B30DE54FB1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4BC06E0F09831A6B77F474A /* CoreDomain in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E43D99045C481EB39960E92B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C315C71126B9DBC8C755493E /* CoreDomain in Frameworks */,
+				8E9522460237127603565861 /* DesignSystem in Frameworks */,
+				C3A5D24336A83658D633546B /* LibraryFeature in Frameworks */,
+				FC3E31C919F4B212210B661C /* ReaderFeature in Frameworks */,
+				2F3D32925A1141AEC0254CBF /* AnnotationFeature in Frameworks */,
+				6C91A2580330708EB2929508 /* PlaybackFeature in Frameworks */,
+				6CD4335325458B2C6A5B5001 /* NotationFeature in Frameworks */,
+				AE5F14CEBBC85A6B8379A1FA /* SyncFeature in Frameworks */,
+				0DAD989FE6FD43F3977231C0 /* DeviceLinkFeature in Frameworks */,
+				2EEC2E26F5A191D452E1439A /* SetlistFeature in Frameworks */,
+				EFDE3811D77F77BDEECE09FD /* InputTrackingFeature in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		04299C148AFC37E43360F569 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				1E8706A16871B3242979261D /* AureliaScoreTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		3499E3EE11DC423E6CDE3D85 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				A1B3CE5787BC6856C817F13B /* AnnotationFeature */,
+				EE20938063CE5FA53EC64C7A /* CoreDomain */,
+				201051452A43342E177925A1 /* DesignSystem */,
+				90A0988CDE3BE39C7F19F63F /* DeviceLinkFeature */,
+				39D33E963E6CEF21E780B8D1 /* InputTrackingFeature */,
+				6269342AF3F42338826892A4 /* LibraryFeature */,
+				65EE0E193D29CA5684ADA549 /* NotationFeature */,
+				9396F15A5FAD2523054DACF4 /* PlaybackFeature */,
+				3087B67A1208CCD08835DD0C /* ReaderFeature */,
+				4409606F4922601B8D932881 /* SetlistFeature */,
+				74E69DEE1727D0BE55A70526 /* SyncFeature */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		730DCE1F1A70559196F94CE6 /* AureliaScore */ = {
+			isa = PBXGroup;
+			children = (
+				B85B948025E0CDA2EA9263E8 /* App */,
+				830F91C9ABAC86DA297519C7 /* Assets.xcassets */,
+				BDD527922244918996275B8C /* AureliaScore.entitlements */,
+				A13029399F98F66F0F53B071 /* Info.plist */,
+			);
+			path = AureliaScore;
+			sourceTree = "<group>";
+		};
+		7EABFCEE8D071BD8DFEE4E54 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				16D42471858DEEB302FB538E /* AureliaScore-iOS.app */,
+				D054C29E3F56D92ECABBC0D4 /* AureliaScore-macOS.app */,
+				B97742AD229870CF197EE28A /* AureliaScoreTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B85B948025E0CDA2EA9263E8 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				963923AFF75F49080D7C0B07 /* AureliaScoreApp.swift */,
+				FED51D6D94D3024AA19E9B99 /* ContentView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		DEEDA4A28B4E4A336A610242 = {
+			isa = PBXGroup;
+			children = (
+				730DCE1F1A70559196F94CE6 /* AureliaScore */,
+				3499E3EE11DC423E6CDE3D85 /* Packages */,
+				04299C148AFC37E43360F569 /* Tests */,
+				7EABFCEE8D071BD8DFEE4E54 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		23C8913C0A57CC20B5E52A72 /* AureliaScore-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0E9B06C98CA78D1BF905BB63 /* Build configuration list for PBXNativeTarget "AureliaScore-macOS" */;
+			buildPhases = (
+				9EF4BF4170FFABDA17983D6E /* Sources */,
+				B935CA8698BC4222C7BA5735 /* Resources */,
+				E43D99045C481EB39960E92B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "AureliaScore-macOS";
+			packageProductDependencies = (
+				FC1FF2C3C2259E11A944B346 /* CoreDomain */,
+				8CEE3F9439891559C9969D7A /* DesignSystem */,
+				7D0EDF429AB00F231C9BC430 /* LibraryFeature */,
+				52ED9A50B7A75F5F2BE33576 /* ReaderFeature */,
+				FAB9480F28E4F3E3F70C4335 /* AnnotationFeature */,
+				DAEFE11BC6F6AF207551C607 /* PlaybackFeature */,
+				A2D4240B116D3BC3AEF9541E /* NotationFeature */,
+				39B63756C8820AB0FA14EDCA /* SyncFeature */,
+				5A02377C4B9209C9E742F8F6 /* DeviceLinkFeature */,
+				D1C16CBAB747DE7E5900455A /* SetlistFeature */,
+				135A7B90EBD6DCAACDBA4DCC /* InputTrackingFeature */,
+			);
+			productName = "AureliaScore-macOS";
+			productReference = D054C29E3F56D92ECABBC0D4 /* AureliaScore-macOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		82E47064C8C4C68C3BE28CFE /* AureliaScore-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E86416AD9FFF7525BF456B4 /* Build configuration list for PBXNativeTarget "AureliaScore-iOS" */;
+			buildPhases = (
+				DED1138111EA9F3E67A2BD4A /* Sources */,
+				F5A12B103887AB5B23CD1D88 /* Resources */,
+				BA6B016681B7ABA61823B5AE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "AureliaScore-iOS";
+			packageProductDependencies = (
+				CDF782D1484685F07C2B733C /* CoreDomain */,
+				E8CC74281AE6A4BF33E58B80 /* DesignSystem */,
+				40E212FA2ABDA0E1A2607EC7 /* LibraryFeature */,
+				2BF5599B5071E4282120F034 /* ReaderFeature */,
+				B7FCF06AEB71755D21501A79 /* AnnotationFeature */,
+				1D7649225098A1F0E2852A39 /* PlaybackFeature */,
+				B589F48B4ED24F9B7429291E /* NotationFeature */,
+				F5A8762E75BD355B5C3FF979 /* SyncFeature */,
+				B599F6A4CBC1853064E60446 /* DeviceLinkFeature */,
+				3834CE157D10CB243DC75319 /* SetlistFeature */,
+				8EE7CE790F4FAE8EE8507FBB /* InputTrackingFeature */,
+			);
+			productName = "AureliaScore-iOS";
+			productReference = 16D42471858DEEB302FB538E /* AureliaScore-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9EA57F9E5FA657CB9B9B7CD3 /* AureliaScoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2461AFCD9662DF058E2F8B64 /* Build configuration list for PBXNativeTarget "AureliaScoreTests" */;
+			buildPhases = (
+				B62FC28A4BE9C3D149E08A4E /* Sources */,
+				DD5BA919E4BF56B30DE54FB1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F1CC77961A02DD647CB869CB /* PBXTargetDependency */,
+			);
+			name = AureliaScoreTests;
+			packageProductDependencies = (
+				9975C8D380DEAC861A0F7637 /* CoreDomain */,
+			);
+			productName = AureliaScoreTests;
+			productReference = B97742AD229870CF197EE28A /* AureliaScoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0D6D6E02E9C957FBFFB057EF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					23C8913C0A57CC20B5E52A72 = {
+						DevelopmentTeam = FTBBTCJ34T;
+						ProvisioningStyle = Automatic;
+					};
+					82E47064C8C4C68C3BE28CFE = {
+						DevelopmentTeam = FTBBTCJ34T;
+						ProvisioningStyle = Automatic;
+					};
+					9EA57F9E5FA657CB9B9B7CD3 = {
+						DevelopmentTeam = FTBBTCJ34T;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 95A0D0DFBE50D4CC3D0E9515 /* Build configuration list for PBXProject "AureliaScore" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = DEEDA4A28B4E4A336A610242;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				60768A579F2D2C4425A58282 /* XCLocalSwiftPackageReference "Packages/AnnotationFeature" */,
+				4A814F0FAC47D3490FE6ACD1 /* XCLocalSwiftPackageReference "Packages/CoreDomain" */,
+				E1A6E1B40B19ED7A2E290793 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */,
+				EC37A5E1151DA4FB8852FA42 /* XCLocalSwiftPackageReference "Packages/DeviceLinkFeature" */,
+				E26831BCB70712473D009D05 /* XCLocalSwiftPackageReference "Packages/InputTrackingFeature" */,
+				96215A722173C69C7AB7C77D /* XCLocalSwiftPackageReference "Packages/LibraryFeature" */,
+				8033C79CE3D5A85ECCE8B041 /* XCLocalSwiftPackageReference "Packages/NotationFeature" */,
+				96729143D51DB5EF81F5BF4B /* XCLocalSwiftPackageReference "Packages/PlaybackFeature" */,
+				4EA1BA48819AEEEE43D80D9B /* XCLocalSwiftPackageReference "Packages/ReaderFeature" */,
+				EF6C54A8E5C850832789C76B /* XCLocalSwiftPackageReference "Packages/SetlistFeature" */,
+				A928CD0C9591A77259D9B0A0 /* XCLocalSwiftPackageReference "Packages/SyncFeature" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 7EABFCEE8D071BD8DFEE4E54 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				82E47064C8C4C68C3BE28CFE /* AureliaScore-iOS */,
+				23C8913C0A57CC20B5E52A72 /* AureliaScore-macOS */,
+				9EA57F9E5FA657CB9B9B7CD3 /* AureliaScoreTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B935CA8698BC4222C7BA5735 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				662D7F37B718C3DBE19C40AC /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F5A12B103887AB5B23CD1D88 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0798B787F2F4BF4F9AF4BE67 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9EF4BF4170FFABDA17983D6E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B4CBE49407CC0EFA0A429FB /* AureliaScoreApp.swift in Sources */,
+				216EE0B25B4D0D7F3DD0E3B8 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B62FC28A4BE9C3D149E08A4E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				219F07971FD0F5833E07FCD7 /* AureliaScoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DED1138111EA9F3E67A2BD4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				131D5CBAA5F8D888F4846D0A /* AureliaScoreApp.swift in Sources */,
+				9A179E0A21A71D2A6A2CFE7E /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F1CC77961A02DD647CB869CB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 82E47064C8C4C68C3BE28CFE /* AureliaScore-iOS */;
+			targetProxy = 1F445029E5614B553A79C950 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1C87898D8A0C79637772A32D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aureliascore.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AureliaScore-iOS.app/AureliaScore-iOS";
+			};
+			name = Debug;
+		};
+		3C062E88AFC4AD6483376131 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AureliaScore/AureliaScore.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = AureliaScore/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aureliascore.app;
+				PRODUCT_NAME = "Aurelia Score";
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3F2757C96270DA2131B791A1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AureliaScore/AureliaScore.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = AureliaScore/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aureliascore.app;
+				PRODUCT_NAME = "Aurelia Score";
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Debug;
+		};
+		72E8F2CC4D893A4E99C6E285 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = FTBBTCJ34T;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		8212CC48873DCD90525D140D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aureliascore.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AureliaScore-iOS.app/AureliaScore-iOS";
+			};
+			name = Release;
+		};
+		D35E760A015383EE9487AD1B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AureliaScore/AureliaScore.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = AureliaScore/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aureliascore.app;
+				PRODUCT_NAME = "Aurelia Score";
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		DE37D7D08B7719296574976E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = FTBBTCJ34T;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		F28CD8D420DDEBC771D30161 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AureliaScore/AureliaScore.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = AureliaScore/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aureliascore.app;
+				PRODUCT_NAME = "Aurelia Score";
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0E9B06C98CA78D1BF905BB63 /* Build configuration list for PBXNativeTarget "AureliaScore-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3F2757C96270DA2131B791A1 /* Debug */,
+				F28CD8D420DDEBC771D30161 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2461AFCD9662DF058E2F8B64 /* Build configuration list for PBXNativeTarget "AureliaScoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1C87898D8A0C79637772A32D /* Debug */,
+				8212CC48873DCD90525D140D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5E86416AD9FFF7525BF456B4 /* Build configuration list for PBXNativeTarget "AureliaScore-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C062E88AFC4AD6483376131 /* Debug */,
+				D35E760A015383EE9487AD1B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		95A0D0DFBE50D4CC3D0E9515 /* Build configuration list for PBXProject "AureliaScore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DE37D7D08B7719296574976E /* Debug */,
+				72E8F2CC4D893A4E99C6E285 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4A814F0FAC47D3490FE6ACD1 /* XCLocalSwiftPackageReference "Packages/CoreDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CoreDomain;
+		};
+		4EA1BA48819AEEEE43D80D9B /* XCLocalSwiftPackageReference "Packages/ReaderFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ReaderFeature;
+		};
+		60768A579F2D2C4425A58282 /* XCLocalSwiftPackageReference "Packages/AnnotationFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AnnotationFeature;
+		};
+		8033C79CE3D5A85ECCE8B041 /* XCLocalSwiftPackageReference "Packages/NotationFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/NotationFeature;
+		};
+		96215A722173C69C7AB7C77D /* XCLocalSwiftPackageReference "Packages/LibraryFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/LibraryFeature;
+		};
+		96729143D51DB5EF81F5BF4B /* XCLocalSwiftPackageReference "Packages/PlaybackFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PlaybackFeature;
+		};
+		A928CD0C9591A77259D9B0A0 /* XCLocalSwiftPackageReference "Packages/SyncFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/SyncFeature;
+		};
+		E1A6E1B40B19ED7A2E290793 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DesignSystem;
+		};
+		E26831BCB70712473D009D05 /* XCLocalSwiftPackageReference "Packages/InputTrackingFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/InputTrackingFeature;
+		};
+		EC37A5E1151DA4FB8852FA42 /* XCLocalSwiftPackageReference "Packages/DeviceLinkFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DeviceLinkFeature;
+		};
+		EF6C54A8E5C850832789C76B /* XCLocalSwiftPackageReference "Packages/SetlistFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/SetlistFeature;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		135A7B90EBD6DCAACDBA4DCC /* InputTrackingFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = InputTrackingFeature;
+		};
+		1D7649225098A1F0E2852A39 /* PlaybackFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PlaybackFeature;
+		};
+		2BF5599B5071E4282120F034 /* ReaderFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReaderFeature;
+		};
+		3834CE157D10CB243DC75319 /* SetlistFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SetlistFeature;
+		};
+		39B63756C8820AB0FA14EDCA /* SyncFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SyncFeature;
+		};
+		40E212FA2ABDA0E1A2607EC7 /* LibraryFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LibraryFeature;
+		};
+		52ED9A50B7A75F5F2BE33576 /* ReaderFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReaderFeature;
+		};
+		5A02377C4B9209C9E742F8F6 /* DeviceLinkFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeviceLinkFeature;
+		};
+		7D0EDF429AB00F231C9BC430 /* LibraryFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LibraryFeature;
+		};
+		8CEE3F9439891559C9969D7A /* DesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DesignSystem;
+		};
+		8EE7CE790F4FAE8EE8507FBB /* InputTrackingFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = InputTrackingFeature;
+		};
+		9975C8D380DEAC861A0F7637 /* CoreDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoreDomain;
+		};
+		A2D4240B116D3BC3AEF9541E /* NotationFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotationFeature;
+		};
+		B589F48B4ED24F9B7429291E /* NotationFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotationFeature;
+		};
+		B599F6A4CBC1853064E60446 /* DeviceLinkFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeviceLinkFeature;
+		};
+		B7FCF06AEB71755D21501A79 /* AnnotationFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnnotationFeature;
+		};
+		CDF782D1484685F07C2B733C /* CoreDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoreDomain;
+		};
+		D1C16CBAB747DE7E5900455A /* SetlistFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SetlistFeature;
+		};
+		DAEFE11BC6F6AF207551C607 /* PlaybackFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PlaybackFeature;
+		};
+		E8CC74281AE6A4BF33E58B80 /* DesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DesignSystem;
+		};
+		F5A8762E75BD355B5C3FF979 /* SyncFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SyncFeature;
+		};
+		FAB9480F28E4F3E3F70C4335 /* AnnotationFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnnotationFeature;
+		};
+		FC1FF2C3C2259E11A944B346 /* CoreDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoreDomain;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0D6D6E02E9C957FBFFB057EF /* Project object */;
+}

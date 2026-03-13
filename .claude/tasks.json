@@ -1,5 +1,516 @@
 {
   "schemaVersion": 1,
-  "lastUpdated": "",
-  "tasks": []
+  "lastUpdated": "2026-03-13",
+  "tasks": [
+    {
+      "id": "P0-001",
+      "phase": "Phase 0 — Project Scaffolding",
+      "title": "Create Xcode project with multi-platform targets (iOS, macOS)",
+      "status": "done",
+      "depends": [],
+      "notes": "Single Xcode project with iOS and macOS targets sharing code. Use SwiftUI App lifecycle."
+    },
+    {
+      "id": "P0-002",
+      "phase": "Phase 0 — Project Scaffolding",
+      "title": "Set up Swift Package structure for modular architecture",
+      "status": "done",
+      "depends": ["P0-001"],
+      "notes": "Create local SPM packages: CoreDomain, LibraryFeature, ReaderFeature, AnnotationFeature, PlaybackFeature, NotationFeature, SyncFeature, DeviceLinkFeature, SetlistFeature, InputTrackingFeature, DesignSystem."
+    },
+    {
+      "id": "P0-003",
+      "phase": "Phase 0 — Project Scaffolding",
+      "title": "Define CoreDomain data models (Score, ScoreAsset, SetList, Bookmark, etc.)",
+      "status": "done",
+      "depends": ["P0-002"],
+      "notes": "SwiftData models for Score, ScoreAsset, AnnotationLayer, AnnotationStroke, AnnotationObject, SetList, SetListItem, Bookmark, JumpLink, PlaybackProfile, UserPreference, SyncRecord, ScoreFamily, RehearsalMark."
+    },
+    {
+      "id": "P0-004",
+      "phase": "Phase 0 — Project Scaffolding",
+      "title": "Create DesignSystem package with color tokens, typography, and shared components",
+      "status": "done",
+      "depends": ["P0-002"],
+      "notes": "Premium visual language: dark/light themes, glass effects, typography-forward layout, custom iconography foundations."
+    },
+    {
+      "id": "P0-005",
+      "phase": "Phase 0 — Project Scaffolding",
+      "title": "Set up app entry point, tab navigation, and routing skeleton",
+      "status": "done",
+      "depends": ["P0-001", "P0-004"],
+      "notes": "Main app with tab bar: Library, Setlists, Settings. Navigation stack per tab. Platform-adaptive layout (sidebar on macOS/iPad)."
+    },
+    {
+      "id": "P0-006",
+      "phase": "Phase 0 — Project Scaffolding",
+      "title": "Add sample PDF scores to Resources/SampleScores for development testing",
+      "status": "done",
+      "depends": ["P0-001"],
+      "notes": "Include 2-3 public domain PDF scores for testing import and rendering."
+    },
+
+    {
+      "id": "P1-001",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build file import service (Files app, drag-and-drop, share extension)",
+      "status": "pending",
+      "depends": ["P0-003"],
+      "notes": "Import PDFs from Files app, iCloud Drive, drag-and-drop. Detect duplicates. Store in app container. Support bulk folder import."
+    },
+    {
+      "id": "P1-002",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build library metadata editing UI (title, composer, tags, genre, etc.)",
+      "status": "pending",
+      "depends": ["P0-003", "P0-004"],
+      "notes": "Edit title, composer, arranger, genre, key, instrumentation, difficulty, duration, notes, custom tags. Auto-detect metadata from filename where possible."
+    },
+    {
+      "id": "P1-003",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Library Home screen with grid/list browsing and search",
+      "status": "pending",
+      "depends": ["P1-002"],
+      "notes": "Rich thumbnail grid, list view toggle. Search by title/composer/tag/text. Sort by recent, title, composer, genre, difficulty. Filter by collection/tag. Mark favorites."
+    },
+    {
+      "id": "P1-004",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Collections / Tags / Composers browser views",
+      "status": "pending",
+      "depends": ["P1-003"],
+      "notes": "Browse by category, collection, tag, composer. Assign scores to collections. Folder-like organization."
+    },
+    {
+      "id": "P1-005",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Score Detail page",
+      "status": "pending",
+      "depends": ["P1-003"],
+      "notes": "Show score metadata, thumbnail preview, attached assets, actions (open, edit metadata, add to setlist, delete). Premium layout."
+    },
+    {
+      "id": "P1-006",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build high-performance PDF rendering engine for score reader",
+      "status": "pending",
+      "depends": ["P0-003"],
+      "notes": "Tiled rendering, page cache, prefetch adjacent pages. Support single-page, vertical scroll, horizontal paged views. Smooth zoom/pan at 120Hz. Do not rely solely on PDFKit if limiting."
+    },
+    {
+      "id": "P1-007",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Reader/Performance view with display modes",
+      "status": "pending",
+      "depends": ["P1-006"],
+      "notes": "Single-page, vertical scroll, horizontal paged, two-page spread on large displays. Cropped margin mode. Night/dark/sepia modes. High-contrast mode. Smart zoom presets. Per-score viewing preferences."
+    },
+    {
+      "id": "P1-008",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build safe Performance Mode with accidental-touch prevention",
+      "status": "pending",
+      "depends": ["P1-007"],
+      "notes": "Strip all UI clutter. Large tap zones for page turn only. Prevent accidental actions. Lock orientation option."
+    },
+    {
+      "id": "P1-009",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Implement basic annotation toolbar (pen, pencil, highlighter, eraser, text, shapes)",
+      "status": "pending",
+      "depends": ["P1-007", "P0-003"],
+      "notes": "Freehand pen, pencil-style, highlighter, eraser, typed text, text boxes, shapes (circle, rect, underline, arrow). Apple Pencil support with palm rejection and pressure/tilt. Undo/redo. Autosave."
+    },
+    {
+      "id": "P1-010",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build annotation persistence and overlay compositing",
+      "status": "pending",
+      "depends": ["P1-009"],
+      "notes": "Save annotations per document in SwiftData. Render annotation overlay on top of PDF pages. Continuous autosave."
+    },
+    {
+      "id": "P1-011",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Setlist module (create, reorder, manage set lists)",
+      "status": "pending",
+      "depends": ["P0-003", "P0-004"],
+      "notes": "Create set lists, drag-and-drop reorder, add/remove scores, create gigs/events/services. Link scores in sequence. Auto-open next score. Duplicate setlist."
+    },
+    {
+      "id": "P1-012",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Setlist builder UI and performance session flow",
+      "status": "pending",
+      "depends": ["P1-011", "P1-007"],
+      "notes": "Setlist view with ordered items. Tap to open score in reader. Navigate between setlist items. Performance notes per item. Pause timers between items."
+    },
+    {
+      "id": "P1-013",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Implement bookmarks and page navigation (jump to page, bookmarks panel)",
+      "status": "pending",
+      "depends": ["P1-007", "P0-003"],
+      "notes": "Add/remove bookmarks to pages. Bookmarks panel. Quick jump to page. Table of contents if available in PDF."
+    },
+    {
+      "id": "P1-014",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Implement basic CloudKit sync for library metadata and scores",
+      "status": "pending",
+      "depends": ["P0-003", "P1-001"],
+      "notes": "Sync Score metadata, setlists, bookmarks via CloudKit. Offline-first with background sync. Status indicators. Per-device download optimization."
+    },
+    {
+      "id": "P1-015",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Implement Bluetooth page-turn pedal support",
+      "status": "pending",
+      "depends": ["P1-007"],
+      "notes": "Detect and handle Bluetooth HID pedals. Map pedal buttons to page forward/back. Keyboard shortcut support for page turns."
+    },
+    {
+      "id": "P1-016",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Implement manual page-turn options (tap zones, swipe, half-page turn)",
+      "status": "pending",
+      "depends": ["P1-007"],
+      "notes": "Configurable tap zones (left/right/bottom). Swipe gestures. Half-page turn / smart turn modes. Apple Pencil gesture options."
+    },
+    {
+      "id": "P1-017",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Build Settings screen with preferences management",
+      "status": "pending",
+      "depends": ["P0-005", "P0-003"],
+      "notes": "App settings: default view mode, theme, page-turn behavior, pedal config, sync toggle, storage management."
+    },
+    {
+      "id": "P1-018",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Polish premium UI: animations, transitions, empty states, and overall visual refinement",
+      "status": "pending",
+      "depends": ["P1-003", "P1-007", "P1-012"],
+      "notes": "Micro-interactions, smooth transitions, premium empty states, elegant iconography. Ensure luxurious, restrained, modern Apple-native feel throughout."
+    },
+    {
+      "id": "P1-019",
+      "phase": "Phase 1 — Premium PDF Reader MVP",
+      "title": "Write wiki documentation for Phase 1 features in docs/",
+      "status": "pending",
+      "depends": ["P1-018"],
+      "notes": "Complete wiki pages covering library, reader, annotations, setlists, bookmarks, sync, page turning, and architecture decisions."
+    },
+
+    {
+      "id": "P2-001",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Implement annotation layers (teacher/performer/rehearsal layers)",
+      "status": "pending",
+      "depends": ["P1-010"],
+      "notes": "Multiple annotation layers per document. Named layers (teacher, performer, rehearsal). Hide/show layers instantly. Layer-specific colors."
+    },
+    {
+      "id": "P2-002",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Add stamps/symbols library (breath mark, bowing, fingering, cue, fermata, etc.)",
+      "status": "pending",
+      "depends": ["P1-009"],
+      "notes": "Stamps: breath mark, bowing, fingering, cue marker, cutoff, fermata reminder. Image stickers. Color-coded rehearsal markings."
+    },
+    {
+      "id": "P2-003",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Implement annotation version snapshots and restore points",
+      "status": "pending",
+      "depends": ["P2-001"],
+      "notes": "Version snapshots for annotation state. Restore to previous version. Undo/redo history preserved across sessions."
+    },
+    {
+      "id": "P2-004",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Build annotated PDF export (flatten or preserve editable)",
+      "status": "pending",
+      "depends": ["P2-001"],
+      "notes": "Export annotated PDF with options: flatten annotations, preserve as editable overlays. Raw annotation data backup export."
+    },
+    {
+      "id": "P2-005",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Implement CloudKit sync for annotations with conflict resolution",
+      "status": "pending",
+      "depends": ["P1-014", "P2-001"],
+      "notes": "Sync annotation layers and strokes via CloudKit. Conflict resolution strategy for concurrent edits. Explicit sync status indicators."
+    },
+    {
+      "id": "P2-006",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Build linked-device pairing via Multipeer Connectivity",
+      "status": "pending",
+      "depends": ["P0-003"],
+      "notes": "Peer-to-peer device discovery and pairing. Primary/secondary controller mode. Local network or Multipeer Connectivity."
+    },
+    {
+      "id": "P2-007",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Implement two-device page spread (left page + right page across devices)",
+      "status": "pending",
+      "depends": ["P2-006", "P1-007"],
+      "notes": "Extend one score across two devices. Left page on one, right page on other. Page-turn sync. Portrait/landscape negotiation."
+    },
+    {
+      "id": "P2-008",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Implement conductor/performer mirrored display mode",
+      "status": "pending",
+      "depends": ["P2-006", "P1-007"],
+      "notes": "Mirror score between conductor and performer devices. Annotation visibility options per device. Sync page position."
+    },
+    {
+      "id": "P2-009",
+      "phase": "Phase 2 — Advanced Annotation + Device Sync",
+      "title": "Write wiki documentation for Phase 2 features in docs/",
+      "status": "pending",
+      "depends": ["P2-008"],
+      "notes": "Document annotation layers, export, sync conflict resolution, linked devices, and two-device spread."
+    },
+
+    {
+      "id": "P3-001",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Build MusicXML parser and normalized score model",
+      "status": "pending",
+      "depends": ["P0-003"],
+      "notes": "Parse MusicXML/MXL files into internal normalized score representation. Extract measures, staves, parts, notes, dynamics, tempo markings, rehearsal marks."
+    },
+    {
+      "id": "P3-002",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Build MEI importer (convert MEI to internal score model)",
+      "status": "pending",
+      "depends": ["P3-001"],
+      "notes": "Parse MEI format and convert to same normalized internal model. Future-proofing for research-grade notation."
+    },
+    {
+      "id": "P3-003",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Build structured measure map and timing engine",
+      "status": "pending",
+      "depends": ["P3-001"],
+      "notes": "Generate measure map with timing from parsed notation. Support tempo changes, time signature changes, repeats. Map measures to playback positions."
+    },
+    {
+      "id": "P3-004",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Build audio playback engine (AVAudioEngine + soundfont/MIDI)",
+      "status": "pending",
+      "depends": ["P3-003"],
+      "notes": "Core MIDI + AVAudioEngine. High-quality sample playback or built-in soundfont engine. Instrument sound assignment per part."
+    },
+    {
+      "id": "P3-005",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Implement playback controls (play/pause, tempo, count-in, metronome)",
+      "status": "pending",
+      "depends": ["P3-004"],
+      "notes": "Play/pause, tempo slider, count-in, metronome overlay. Play from arbitrary measure. Gradual tempo increase mode."
+    },
+    {
+      "id": "P3-006",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Implement loop region and section looping (by measure, by rehearsal mark)",
+      "status": "pending",
+      "depends": ["P3-005"],
+      "notes": "Loop region playback. Per-measure looping. Section looping by rehearsal mark. Slow practice mode."
+    },
+    {
+      "id": "P3-007",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Build mixer panel (mute/solo staves, volume balance, instrument assignment)",
+      "status": "pending",
+      "depends": ["P3-004"],
+      "notes": "Mute/solo individual staves. Volume balance per part. Instrument sound assignment per part. Hands-separate/part-isolate mode."
+    },
+    {
+      "id": "P3-008",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Implement visual playhead/cursor with auto-scroll and note highlighting",
+      "status": "pending",
+      "depends": ["P3-005", "P1-007"],
+      "notes": "Visual playhead cursor through score. Staff/note highlighting. Follow playback with auto-scroll or auto-page-turn. Sync cursor to rendered pages."
+    },
+    {
+      "id": "P3-009",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Build rehearsal marks panel and playback navigation",
+      "status": "pending",
+      "depends": ["P3-001", "P1-013"],
+      "notes": "Rehearsal marks extracted from notation. Navigate to rehearsal mark. Play from rehearsal mark. Movement/section markers panel."
+    },
+    {
+      "id": "P3-010",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Implement transposition-aware playback",
+      "status": "pending",
+      "depends": ["P3-004", "P3-001"],
+      "notes": "Transpose playback where notation model supports it. Display transposition indicator."
+    },
+    {
+      "id": "P3-011",
+      "phase": "Phase 3 — Structured Notation Playback",
+      "title": "Write wiki documentation for Phase 3 features in docs/",
+      "status": "pending",
+      "depends": ["P3-010"],
+      "notes": "Document MusicXML parsing, playback engine, mixer, looping, rehearsal navigation, and notation model architecture."
+    },
+
+    {
+      "id": "P4-001",
+      "phase": "Phase 4 — Motion / Head / Eye Page Turning",
+      "title": "Build head movement tracking for page turns (Vision framework / ARKit)",
+      "status": "pending",
+      "depends": ["P1-007"],
+      "notes": "Front camera pose estimation using Vision framework or ARKit face tracking. Detect left/right head movement. On-device processing only."
+    },
+    {
+      "id": "P4-002",
+      "phase": "Phase 4 — Motion / Head / Eye Page Turning",
+      "title": "Build eye gaze / gaze dwell page-turning",
+      "status": "pending",
+      "depends": ["P4-001"],
+      "notes": "Eye gaze detection for page-turn trigger. Dwell time configuration. Optional hold-to-confirm method."
+    },
+    {
+      "id": "P4-003",
+      "phase": "Phase 4 — Motion / Head / Eye Page Turning",
+      "title": "Build calibration and training screen for motion-based turning",
+      "status": "pending",
+      "depends": ["P4-001"],
+      "notes": "Rehearsal calibration screen. Confidence threshold tuning. Sensitivity and debounce configuration. Preview/training mode. Left/right movement assignment."
+    },
+    {
+      "id": "P4-004",
+      "phase": "Phase 4 — Motion / Head / Eye Page Turning",
+      "title": "Implement safety controls (debounce, confidence threshold, accessibility fallback)",
+      "status": "pending",
+      "depends": ["P4-001", "P4-002"],
+      "notes": "No accidental turns from casual movement. Strong privacy controls. Clear camera permission disclosures. Accessibility-safe fallback handling. Battery-efficient camera usage."
+    },
+    {
+      "id": "P4-005",
+      "phase": "Phase 4 — Motion / Head / Eye Page Turning",
+      "title": "Write wiki documentation for Phase 4 features in docs/",
+      "status": "pending",
+      "depends": ["P4-004"],
+      "notes": "Document head/eye tracking implementation, calibration, privacy controls, and performance tuning."
+    },
+
+    {
+      "id": "P5-001",
+      "phase": "Phase 5 — Advanced Musical Intelligence",
+      "title": "Implement jump logic for navigation links (coda, DS, DC, repeats)",
+      "status": "pending",
+      "depends": ["P1-013", "P3-001"],
+      "notes": "Tappable navigation hotspots for coda/DS/DC/repeats. Manual link creation. Return behavior after jumps. Links from one score to another."
+    },
+    {
+      "id": "P5-002",
+      "phase": "Phase 5 — Advanced Musical Intelligence",
+      "title": "Build score family linking (full score + parts, alternate editions)",
+      "status": "pending",
+      "depends": ["P0-003"],
+      "notes": "Attach full score and parts as a score family. Switch between part and conductor score. Linked page references. Alternate editions for same work."
+    },
+    {
+      "id": "P5-003",
+      "phase": "Phase 5 — Advanced Musical Intelligence",
+      "title": "Implement cross-device Handoff and session continuity",
+      "status": "pending",
+      "depends": ["P2-006", "P1-014"],
+      "notes": "Handoff-like continuation between iPhone, iPad, Mac. Pick up where you left off. Transfer active setlist session. Sync current page and position."
+    },
+    {
+      "id": "P5-004",
+      "phase": "Phase 5 — Advanced Musical Intelligence",
+      "title": "Build MIDI keyboard input comparison (practice feedback)",
+      "status": "pending",
+      "depends": ["P3-004"],
+      "notes": "MIDI keyboard input detection. Compare played notes against score. Visual feedback for correct/incorrect notes. Foundation for score-following."
+    },
+    {
+      "id": "P5-005",
+      "phase": "Phase 5 — Advanced Musical Intelligence",
+      "title": "Research and prototype score-following (microphone/MIDI)",
+      "status": "pending",
+      "depends": ["P5-004", "P3-003"],
+      "notes": "Exploration path: pitch detection from microphone input. Align live performance with score position. Auto-page-turn from score following."
+    },
+    {
+      "id": "P5-006",
+      "phase": "Phase 5 — Advanced Musical Intelligence",
+      "title": "Write wiki documentation for Phase 5 features in docs/",
+      "status": "pending",
+      "depends": ["P5-005"],
+      "notes": "Document jump logic, score families, Handoff, MIDI practice, and score-following research."
+    },
+
+    {
+      "id": "P6-001",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "Build onboarding flow and first-launch experience",
+      "status": "pending",
+      "depends": ["P1-018"],
+      "notes": "Premium onboarding screens. Import first score flow. Feature highlights. Quick setup wizard."
+    },
+    {
+      "id": "P6-002",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "Implement trial/paywall and in-app purchase/subscription",
+      "status": "pending",
+      "depends": ["P6-001"],
+      "notes": "Free tier + Pro unlock. Optional subscription for cloud features. StoreKit 2 integration. Restore purchases. Trial gating."
+    },
+    {
+      "id": "P6-003",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "Implement privacy-respecting analytics",
+      "status": "pending",
+      "depends": ["P6-001"],
+      "notes": "Minimal, privacy-first analytics. No unnecessary telemetry. Feature usage tracking for product decisions only."
+    },
+    {
+      "id": "P6-004",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "Build VoiceOver and accessibility support",
+      "status": "pending",
+      "depends": ["P1-018"],
+      "notes": "VoiceOver support throughout. Large controls in performance mode. High contrast mode. Switch control compatibility. Configurable gesture/touch zones."
+    },
+    {
+      "id": "P6-005",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "Build library backup/restore and migration tools",
+      "status": "pending",
+      "depends": ["P1-014"],
+      "notes": "Full library backup bundle export/import. Metadata backup. Set list export/share. Migration from other apps if feasible."
+    },
+    {
+      "id": "P6-006",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "App Store optimization (screenshots, descriptions, keywords)",
+      "status": "pending",
+      "depends": ["P6-002"],
+      "notes": "App Store listing. Screenshots for all device sizes. Compelling description. Keyword optimization. Privacy nutrition labels."
+    },
+    {
+      "id": "P6-007",
+      "phase": "Phase 6 — Commercial Polish",
+      "title": "Write wiki documentation for Phase 6 and final architecture overview in docs/",
+      "status": "pending",
+      "depends": ["P6-006"],
+      "notes": "Final documentation pass: onboarding, monetization, accessibility, App Store, and complete architecture wiki."
+    }
+  ]
 }
