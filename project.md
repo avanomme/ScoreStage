@@ -12,6 +12,7 @@ A premium sheet music performance, practice, playback, and library-management ap
 This app is intended for commercial distribution and sale, with a high-end Apple-native user experience, deep score interaction, synchronized annotations, advanced page-turning options, and best-in-class playback for musicians, teachers, accompanists, conductors, pit musicians, church musicians, choirs, and students.
 
 This App must be very well documented with a complete wiki created as we do inside docs/
+Ensure to push after every Phase is completed
 
 ⸻
 
