@@ -69,12 +69,14 @@ public final class ReaderViewModel {
         renderService.pageSize(at: index)
     }
 
+    /// Score paper is always light — musicians expect printed-notation contrast.
     public var paperBackgroundColor: Color {
         switch paperTheme {
         case .light: .white
-        case .dark: Color(white: 0.12)
-        case .sepia: Color(red: 0.96, green: 0.93, blue: 0.87)
-        case .highContrast: .black
+        case .sepia: Color(red: 0.98, green: 0.96, blue: 0.90)    // cream
+        case .warm: Color(red: 0.96, green: 0.93, blue: 0.87)     // warm off-white
+        case .highContrast: Color(white: 0.94)                     // light gray
+        case .dark: .white                                          // fallback to light
         }
     }
 

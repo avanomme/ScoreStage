@@ -264,7 +264,7 @@
       "id": "P2-001",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Implement annotation layers (teacher/performer/rehearsal layers)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-010"
       ],
@@ -274,7 +274,7 @@
       "id": "P2-002",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Add stamps/symbols library (breath mark, bowing, fingering, cue, fermata, etc.)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-009"
       ],
@@ -284,7 +284,7 @@
       "id": "P2-003",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Implement annotation version snapshots and restore points",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P2-001"
       ],
@@ -294,7 +294,7 @@
       "id": "P2-004",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Build annotated PDF export (flatten or preserve editable)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P2-001"
       ],
@@ -304,7 +304,7 @@
       "id": "P2-005",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Implement CloudKit sync for annotations with conflict resolution",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-014",
         "P2-001"
@@ -315,7 +315,7 @@
       "id": "P2-006",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Build linked-device pairing via Multipeer Connectivity",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P0-003"
       ],
@@ -325,7 +325,7 @@
       "id": "P2-007",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Implement two-device page spread (left page + right page across devices)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P2-006",
         "P1-007"
@@ -336,7 +336,7 @@
       "id": "P2-008",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Implement conductor/performer mirrored display mode",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P2-006",
         "P1-007"
@@ -347,7 +347,7 @@
       "id": "P2-009",
       "phase": "Phase 2 \u2014 Advanced Annotation + Device Sync",
       "title": "Write wiki documentation for Phase 2 features in docs/",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P2-008"
       ],

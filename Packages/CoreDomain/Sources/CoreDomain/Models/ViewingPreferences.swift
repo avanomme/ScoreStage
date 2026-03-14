@@ -8,10 +8,13 @@ public enum DisplayMode: String, Codable, Sendable {
 }
 
 public enum PaperTheme: String, Codable, Sendable {
-    case light
+    case light       // white paper
+    case sepia        // cream / warm paper
+    case warm         // warmer off-white
+    case highContrast // high-contrast light paper (slightly gray background, very dark text)
+
+    // Legacy case kept for data compatibility
     case dark
-    case sepia
-    case highContrast
 }
 
 public struct ViewingPreferences: Codable, Sendable {

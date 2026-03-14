@@ -23,11 +23,11 @@ public enum ASColors {
     public static let cardBackground = Color(nsColor: .windowBackgroundColor)
     #endif
 
-    // MARK: - Paper Themes
-    public static let paperLight = Color.white
-    public static let paperDark = Color(white: 0.12)
-    public static let paperSepia = Color(red: 0.96, green: 0.93, blue: 0.87)
-    public static let paperHighContrast = Color.black
+    // MARK: - Paper Themes (always light — musicians expect printed-notation contrast)
+    public static let paperWhite = Color.white
+    public static let paperCream = Color(red: 0.98, green: 0.96, blue: 0.90)
+    public static let paperWarm = Color(red: 0.96, green: 0.93, blue: 0.87)
+    public static let paperHighContrast = Color(white: 0.94)
 
     // MARK: - Status
     public static let success = Color.green

@@ -9,9 +9,10 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CoreDomain"),
+        .package(path: "../DesignSystem"),
     ],
     targets: [
-        .target(name: "DeviceLinkFeature", dependencies: ["CoreDomain"]),
+        .target(name: "DeviceLinkFeature", dependencies: ["CoreDomain", "DesignSystem"]),
         .testTarget(name: "DeviceLinkFeatureTests", dependencies: ["DeviceLinkFeature"]),
     ]
 )

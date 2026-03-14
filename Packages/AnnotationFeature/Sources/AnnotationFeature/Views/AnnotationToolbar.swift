@@ -35,6 +35,29 @@ public enum AnnotationTool: String, CaseIterable, Identifiable {
     }
 }
 
+/// Lightweight layer info for UI display without SwiftData coupling.
+public struct LayerInfo: Identifiable, Sendable {
+    public let id: UUID
+    public var name: String
+    public var type: AnnotationLayerType
+    public var isVisible: Bool
+    public var sortOrder: Int
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        type: AnnotationLayerType = .default,
+        isVisible: Bool = true,
+        sortOrder: Int = 0
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.isVisible = isVisible
+        self.sortOrder = sortOrder
+    }
+}
+
 @MainActor
 @Observable
 public final class AnnotationState {
@@ -46,11 +69,45 @@ public final class AnnotationState {
     public var canUndo = false
     public var canRedo = false
 
-    public init() {}
+    // MARK: - Layer Management
+
+    public var layers: [LayerInfo] = [
+        LayerInfo(name: "Default", type: .default, sortOrder: 0)
+    ]
+    public var activeLayerID: UUID?
+    public var showingLayerManager = false
+
+    // MARK: - Stamp Selection
+
+    public var selectedStamp: StampSymbol?
+    public var showingStampPicker = false
+
+    // MARK: - Snapshot Management
+
+    public var snapshots: [SnapshotInfo] = []
+    public var showingSnapshotManager = false
+    /// Callback for restoring a snapshot — set by the hosting view controller.
+    public var onRestoreSnapshot: ((UUID) -> Void)?
+
+    /// The name of the active layer, for display.
+    public var activeLayerName: String {
+        layers.first(where: { $0.id == activeLayerID })?.name ?? "Default"
+    }
+
+    /// IDs of currently visible layers.
+    public var visibleLayerIDs: Set<UUID> {
+        Set(layers.filter(\.isVisible).map(\.id))
+    }
+
+    public init() {
+        // Set active layer to the default layer
+        activeLayerID = layers.first?.id
+    }
+
+    // MARK: - Tool Selection
 
     public func selectTool(_ tool: AnnotationTool) {
         selectedTool = tool
-        // Set defaults per tool
         switch tool {
         case .pen:
             lineWidth = 2.0; opacity = 1.0
@@ -67,88 +124,260 @@ public final class AnnotationState {
             lineWidth = 2.0; opacity = 1.0
         }
     }
+
+    // MARK: - Layer Operations
+
+    public func addLayer(name: String, type: AnnotationLayerType) {
+        let nextOrder = (layers.map(\.sortOrder).max() ?? 0) + 1
+        let layer = LayerInfo(name: name, type: type, sortOrder: nextOrder)
+        layers.append(layer)
+        activeLayerID = layer.id
+    }
+
+    public func removeLayer(_ id: UUID) {
+        // Cannot remove the default layer
+        guard let layer = layers.first(where: { $0.id == id }), layer.type != .default else { return }
+        layers.removeAll(where: { $0.id == id })
+        // If we removed the active layer, fall back to default
+        if activeLayerID == id {
+            activeLayerID = layers.first(where: { $0.type == .default })?.id ?? layers.first?.id
+        }
+    }
+
+    public func setActiveLayer(_ id: UUID) {
+        guard layers.contains(where: { $0.id == id }) else { return }
+        activeLayerID = id
+    }
+
+    public func toggleLayerVisibility(_ id: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        layers[index].isVisible.toggle()
+    }
+
+    public func renameLayer(_ id: UUID, to name: String) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        layers[index].name = name
+    }
+
+    // MARK: - Snapshot Operations
+
+    public func createSnapshot(name: String) {
+        let snapshot = SnapshotInfo(name: name)
+        snapshots.insert(snapshot, at: 0) // newest first
+    }
+
+    public func removeSnapshot(_ id: UUID) {
+        snapshots.removeAll(where: { $0.id == id })
+    }
 }
 
+/// Floating Procreate-style annotation palette.
+/// This is a separate environment layer — never embedded in Reader chrome.
 public struct AnnotationToolbarView: View {
     @Bindable var state: AnnotationState
+    @State private var showingColorPicker = false
+    @State private var showingWidthSlider = false
 
     public init(state: AnnotationState) {
         self.state = state
     }
 
     public var body: some View {
-        HStack(spacing: ASSpacing.xs) {
-            // Tool picker
-            ForEach(AnnotationTool.allCases) { tool in
+        VStack(spacing: 0) {
+            // Main tool strip
+            HStack(spacing: ASSpacing.xs) {
+                ForEach(AnnotationTool.allCases) { tool in
+                    toolButton(tool)
+                }
+
+                divider
+
+                // Active color indicator + picker toggle
                 Button {
-                    state.selectTool(tool)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingColorPicker.toggle()
+                        showingWidthSlider = false
+                    }
                 } label: {
-                    Image(systemName: tool.icon)
-                        .font(.body)
-                        .frame(width: 36, height: 36)
-                        .background(state.selectedTool == tool ? ASColors.accentFallback.opacity(0.2) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm))
+                    Circle()
+                        .fill(state.selectedColor)
+                        .frame(width: 22, height: 22)
+                        .overlay(
+                            Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1.5)
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
                 }
                 .buttonStyle(.plain)
-                .help(tool.label)
+
+                // Line width indicator
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingWidthSlider.toggle()
+                        showingColorPicker = false
+                    }
+                } label: {
+                    Circle()
+                        .fill(.primary)
+                        .frame(width: min(state.lineWidth * 1.5, 18), height: min(state.lineWidth * 1.5, 18))
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+
+                // Stamp picker toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        state.showingStampPicker.toggle()
+                        showingColorPicker = false
+                        showingWidthSlider = false
+                    }
+                } label: {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 14, weight: state.showingStampPicker ? .semibold : .medium))
+                        .foregroundStyle(state.showingStampPicker ? ASColors.accentFallback : .primary)
+                }
+                .buttonStyle(.plain)
+                .help("Stamps & Symbols")
+
+                divider
+
+                // Undo / Redo
+                Button { /* undo */ } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .disabled(!state.canUndo)
+                .buttonStyle(.plain)
+
+                Button { /* redo */ } label: {
+                    Image(systemName: "arrow.uturn.forward")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .disabled(!state.canRedo)
+                .buttonStyle(.plain)
+
+                divider
+
+                // Layers toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        state.showingLayerManager.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "square.stack.3d.up")
+                            .font(.system(size: 13, weight: .medium))
+                        Text(state.activeLayerName)
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(state.showingLayerManager ? ASColors.accentFallback : .primary)
+                }
+                .buttonStyle(.plain)
+
+                divider
+
+                // Done — exit annotation environment
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        state.isAnnotating = false
+                    }
+                } label: {
+                    Text("Done")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ASColors.accentFallback)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, ASSpacing.md)
+            .padding(.vertical, ASSpacing.sm)
+
+            // Expandable color palette
+            if showingColorPicker {
+                colorPalette
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            Divider().frame(height: 28)
+            // Expandable width slider
+            if showingWidthSlider {
+                widthSlider
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+    }
 
-            // Color picker
+    // MARK: - Tool Button
+
+    private func toolButton(_ tool: AnnotationTool) -> some View {
+        Button {
+            state.selectTool(tool)
+        } label: {
+            Image(systemName: tool.icon)
+                .font(.system(size: 16, weight: state.selectedTool == tool ? .semibold : .light))
+                .frame(width: 34, height: 34)
+                .background(
+                    state.selectedTool == tool
+                        ? AnyShapeStyle(ASColors.accentFallback.opacity(0.15))
+                        : AnyShapeStyle(Color.clear)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(tool.label)
+    }
+
+    // MARK: - Color Palette
+
+    private var colorPalette: some View {
+        HStack(spacing: ASSpacing.sm) {
             ForEach(ASColors.annotationPalette, id: \.self) { color in
                 Button {
                     state.selectedColor = color
                 } label: {
                     Circle()
                         .fill(color)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 26, height: 26)
                         .overlay {
                             if state.selectedColor == color {
                                 Circle()
-                                    .strokeBorder(.white, lineWidth: 2)
+                                    .strokeBorder(.white, lineWidth: 2.5)
                                     .frame(width: 20, height: 20)
                             }
                         }
                 }
                 .buttonStyle(.plain)
             }
-
-            Divider().frame(height: 28)
-
-            // Line width
-            Slider(value: $state.lineWidth, in: 0.5...20)
-                .frame(width: 80)
-
-            Divider().frame(height: 28)
-
-            // Undo / Redo
-            Button { /* undo action */ } label: {
-                Image(systemName: "arrow.uturn.backward")
-            }
-            .disabled(!state.canUndo)
-            .buttonStyle(.plain)
-
-            Button { /* redo action */ } label: {
-                Image(systemName: "arrow.uturn.forward")
-            }
-            .disabled(!state.canRedo)
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            // Done
-            Button {
-                state.isAnnotating = false
-            } label: {
-                Text("Done")
-                    .font(ASTypography.label)
-                    .foregroundStyle(ASColors.accentFallback)
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, ASSpacing.md)
         .padding(.vertical, ASSpacing.sm)
-        .background(.ultraThinMaterial)
+    }
+
+    // MARK: - Width Slider
+
+    private var widthSlider: some View {
+        HStack(spacing: ASSpacing.md) {
+            Circle()
+                .fill(.primary)
+                .frame(width: 3, height: 3)
+
+            Slider(value: $state.lineWidth, in: 0.5...20)
+                .frame(width: 120)
+
+            Circle()
+                .fill(.primary)
+                .frame(width: 14, height: 14)
+        }
+        .padding(.horizontal, ASSpacing.lg)
+        .padding(.vertical, ASSpacing.sm)
+    }
+
+    // MARK: - Divider
+
+    private var divider: some View {
+        Rectangle()
+            .fill(.quaternary)
+            .frame(width: 1, height: 24)
     }
 }

@@ -47,6 +47,9 @@ public final class Score {
     @Relationship(deleteRule: .cascade, inverse: \RehearsalMark.score)
     public var rehearsalMarks: [RehearsalMark]
 
+    @Relationship(deleteRule: .cascade, inverse: \AnnotationSnapshot.score)
+    public var annotationSnapshots: [AnnotationSnapshot]
+
     public var viewingPreferences: ViewingPreferences?
 
     public init(
@@ -86,5 +89,6 @@ public final class Score {
         self.jumpLinks = []
         self.playbackProfiles = []
         self.rehearsalMarks = []
+        self.annotationSnapshots = []
     }
 }

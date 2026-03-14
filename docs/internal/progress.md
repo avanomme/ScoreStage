@@ -76,3 +76,28 @@ Append short session notes here (what changed, why, next steps).
 
 **Next steps:**
 - Begin Phase 2: Advanced Annotation + Device Sync
+
+---
+
+## 2026-03-13 — Phase 2: Advanced Annotation + Device Sync Complete
+
+**What changed:**
+- Built multi-layer annotation system with LayerInfo, LayerManagerView, layer-aware CanvasStroke rendering (P2-001)
+- Added musical stamps library with StampSymbol, StampCategory, StampPickerView, StampLibrary (P2-002)
+- Created annotation version snapshots with AnnotationSnapshot SwiftData model, SnapshotManagerView, AnnotationSnapshotPayload (P2-003)
+- Built annotated PDF export with AnnotatedPDFExporter (flattened/raw modes), ExportAnnotationsView (P2-004)
+- Implemented AnnotationSyncService with conflict resolution strategies, per-layer sync status (P2-005)
+- Built DeviceLinkService with Multipeer Connectivity (MCSession, MCNearbyServiceAdvertiser/Browser), LinkMessage protocol, DevicePairingView (P2-006)
+- Created TwoDeviceSpreadView with left/right page distribution, spread navigation (P2-007)
+- Created ConductorPerformerView with role-based UI, conductor navigation controls, performer follow mode (P2-008)
+- Wrote comprehensive Phase 2 wiki documentation (P2-009)
+
+**Architecture decisions:**
+- CanvasStroke stores per-stroke visual properties + layerID for layer-aware rendering
+- LayerInfo is a lightweight UI struct decoupled from SwiftData AnnotationLayer
+- AnnotatedPDFExporter uses actor isolation for thread safety
+- DeviceLinkService uses nonisolated(unsafe) for MCSession to bridge @MainActor and delegate callbacks
+- Multipeer auto-accepts invitations (can add user confirmation later)
+
+**Next steps:**
+- Begin Phase 3: Structured Notation Playback

@@ -19,10 +19,10 @@ struct SettingsView: View {
                     Text("Two Page Spread").tag("twoPageSpread")
                 }
 
-                Picker("Default Theme", selection: $defaultPaperTheme) {
-                    Text("Light").tag("light")
-                    Text("Dark").tag("dark")
-                    Text("Sepia").tag("sepia")
+                Picker("Paper Style", selection: $defaultPaperTheme) {
+                    Text("White").tag("light")
+                    Text("Cream").tag("sepia")
+                    Text("Warm").tag("warm")
                     Text("High Contrast").tag("highContrast")
                 }
             }

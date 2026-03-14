@@ -3,40 +3,32 @@ import SwiftData
 import CoreDomain
 import DesignSystem
 
+public enum BrowseMode: String, CaseIterable {
+    case composers = "Composers"
+    case genres = "Genres"
+    case tags = "Tags"
+}
+
 public struct CollectionsBrowserView: View {
     @Query private var scores: [Score]
-    @State private var browseMode: BrowseMode = .tags
+    private let mode: BrowseMode
 
-    public init() {}
-
-    enum BrowseMode: String, CaseIterable {
-        case tags = "Tags"
-        case composers = "Composers"
-        case genres = "Genres"
+    public init(mode: BrowseMode = .composers) {
+        self.mode = mode
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            Picker("Browse", selection: $browseMode) {
-                ForEach(BrowseMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding()
-
-            List {
-                switch browseMode {
-                case .tags:
-                    tagsSection
-                case .composers:
-                    composersSection
-                case .genres:
-                    genresSection
-                }
+        List {
+            switch mode {
+            case .tags:
+                tagsSection
+            case .composers:
+                composersSection
+            case .genres:
+                genresSection
             }
         }
-        .navigationTitle("Browse")
+        .navigationTitle(mode.rawValue)
     }
 
     private var tagsSection: some View {
@@ -74,10 +66,11 @@ public struct CollectionsBrowserView: View {
         return List(filtered) { score in
             HStack {
                 VStack(alignment: .leading) {
-                    Text(score.title).font(ASTypography.body)
+                    Text(score.title)
+                        .font(.system(size: 14, weight: .medium))
                     if !score.composer.isEmpty {
                         Text(score.composer)
-                            .font(ASTypography.caption)
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
                 }
