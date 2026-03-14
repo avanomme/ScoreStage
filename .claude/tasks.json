@@ -584,7 +584,7 @@
       "id": "P6-001",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "Build onboarding flow and first-launch experience",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-018"
       ],
@@ -594,7 +594,7 @@
       "id": "P6-002",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "Implement trial/paywall and in-app purchase/subscription",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P6-001"
       ],
@@ -604,7 +604,7 @@
       "id": "P6-003",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "Implement privacy-respecting analytics",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P6-001"
       ],
@@ -614,7 +614,7 @@
       "id": "P6-004",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "Build VoiceOver and accessibility support",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-018"
       ],
@@ -624,7 +624,7 @@
       "id": "P6-005",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "Build library backup/restore and migration tools",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-014"
       ],
@@ -634,7 +634,7 @@
       "id": "P6-006",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "App Store optimization (screenshots, descriptions, keywords)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P6-002"
       ],
@@ -644,7 +644,7 @@
       "id": "P6-007",
       "phase": "Phase 6 \u2014 Commercial Polish",
       "title": "Write wiki documentation for Phase 6 and final architecture overview in docs/",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P6-006"
       ],

@@ -59,7 +59,9 @@ struct OnboardingView: View {
                             .tag(index)
                     }
                 }
+                #if os(iOS)
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                #endif
                 .animation(.easeInOut(duration: 0.25), value: currentPage)
 
                 Spacer()

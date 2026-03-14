@@ -13,12 +13,18 @@ struct ScoreStageApp: App {
             ContentView()
                 .preferredColorScheme(.dark)
                 .background(ASColors.chromeBackground)
+                #if os(iOS)
                 .fullScreenCover(isPresented: $showOnboarding) {
-                    OnboardingView {
-                        showOnboarding = false
-                    }
-                    .preferredColorScheme(.dark)
+                    OnboardingView { showOnboarding = false }
+                        .preferredColorScheme(.dark)
                 }
+                #else
+                .sheet(isPresented: $showOnboarding) {
+                    OnboardingView { showOnboarding = false }
+                        .preferredColorScheme(.dark)
+                        .frame(minWidth: 500, minHeight: 600)
+                }
+                #endif
                 .onAppear {
                     if !hasCompletedOnboarding {
                         showOnboarding = true
