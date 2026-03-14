@@ -7,13 +7,15 @@ import DesignSystem
 public struct ScoreReaderView: View {
     @State var viewModel: ReaderViewModel
     let fileURL: URL
+    let onClose: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var showingControls = false
     @State private var controlsTimer: Task<Void, Never>?
 
-    public init(score: Score, fileURL: URL) {
+    public init(score: Score, fileURL: URL, onClose: (() -> Void)? = nil) {
         self._viewModel = State(initialValue: ReaderViewModel(score: score))
         self.fileURL = fileURL
+        self.onClose = onClose
     }
 
     public var body: some View {

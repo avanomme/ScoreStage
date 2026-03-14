@@ -63,22 +63,28 @@ enum LibrarySidebarItem: String, CaseIterable, Identifiable, Hashable {
 struct ContentView: View {
     @State private var selectedItem: LibrarySidebarItem? = .library
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
-    @State private var scoreToOpen: Score?
-    @State private var readerFileURL: URL?
+    @State private var openedScore: Score?
+    @State private var openedFileURL: URL?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private let importService = ScoreImportService()
 
     var body: some View {
-        #if os(iOS)
-        if horizontalSizeClass == .compact {
-            compactLayout
+        if let score = openedScore, let url = openedFileURL {
+            // Full-window reader — takes over entire window like a music book
+            ScoreReaderView(score: score, fileURL: url, onClose: closeScore)
+                .transition(.move(edge: .trailing))
         } else {
+            #if os(iOS)
+            if horizontalSizeClass == .compact {
+                compactLayout
+            } else {
+                sidebarLayout
+            }
+            #else
             sidebarLayout
+            #endif
         }
-        #else
-        sidebarLayout
-        #endif
     }
 
     // MARK: - Sidebar Layout (iPad / macOS)
@@ -93,20 +99,6 @@ struct ContentView: View {
                 .background(ASColors.chromeBackground)
         }
         .tint(ASColors.accentFallback)
-        #if os(iOS)
-        .fullScreenCover(item: $scoreToOpen) { score in
-            if let url = readerFileURL {
-                ScoreReaderView(score: score, fileURL: url)
-            }
-        }
-        #else
-        .sheet(item: $scoreToOpen) { score in
-            if let url = readerFileURL {
-                ScoreReaderView(score: score, fileURL: url)
-                    .frame(minWidth: 800, minHeight: 600)
-            }
-        }
-        #endif
     }
 
     private var sidebarContent: some View {
@@ -202,11 +194,6 @@ struct ContentView: View {
             .tabItem { Label("Settings", systemImage: "gearshape") }
         }
         .tint(ASColors.accentFallback)
-        .fullScreenCover(item: $scoreToOpen) { score in
-            if let url = readerFileURL {
-                ScoreReaderView(score: score, fileURL: url)
-            }
-        }
     }
     #endif
 
@@ -235,24 +222,26 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Open Score
+    // MARK: - Open / Close Score
 
     private func openScore(_ score: Score) {
         guard let primaryAsset = score.assets.first(where: { $0.isPrimary }) ?? score.assets.first else { return }
         do {
             let url = try importService.fileURL(for: primaryAsset)
             score.lastOpenedAt = Date()
-            readerFileURL = url
-            scoreToOpen = score
+            withAnimation(.easeInOut(duration: 0.2)) {
+                openedFileURL = url
+                openedScore = score
+            }
         } catch {
-            // File not found — could show alert
+            // File not found
         }
     }
 
-    @ViewBuilder
-    private var readerPresentation: some View {
-        if let score = scoreToOpen, let url = readerFileURL {
-            ScoreReaderView(score: score, fileURL: url)
+    private func closeScore() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            openedScore = nil
+            openedFileURL = nil
         }
     }
 }
