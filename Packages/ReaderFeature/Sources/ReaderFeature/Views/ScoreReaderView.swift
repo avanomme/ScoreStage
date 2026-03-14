@@ -186,11 +186,19 @@ public struct ScoreReaderView: View {
             // Top bar — .regularMaterial, 44pt height
             HStack {
                 Button {
-                    dismiss()
+                    if let onClose {
+                        onClose()
+                    } else {
+                        dismiss()
+                    }
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("Library")
+                            .font(.system(size: 14, weight: .regular))
+                    }
+                    .foregroundStyle(.primary)
                 }
                 .buttonStyle(.plain)
 
