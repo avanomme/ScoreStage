@@ -25,11 +25,12 @@ public struct EmptyStateView: View {
 
     public var body: some View {
         VStack(spacing: ASSpacing.lg) {
+            // Icon — 48pt, .light, animated pulse
             Image(systemName: icon)
                 .font(.system(size: 48, weight: .light))
                 .foregroundStyle(ASColors.tertiaryText)
                 .symbolEffect(.pulse.byLayer, options: .repeating.speed(0.5), value: appeared)
-                .scaleEffect(appeared ? 1.0 : 0.8)
+                .scaleEffect(appeared ? 1.0 : 0.85)
                 .opacity(appeared ? 1.0 : 0.0)
 
             VStack(spacing: ASSpacing.sm) {
@@ -41,6 +42,7 @@ public struct EmptyStateView: View {
                     .font(ASTypography.body)
                     .foregroundStyle(ASColors.secondaryText)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
             .opacity(appeared ? 1.0 : 0.0)
             .offset(y: appeared ? 0 : 10)
@@ -52,9 +54,10 @@ public struct EmptyStateView: View {
                     .offset(y: appeared ? 0 : 10)
             }
         }
+        .frame(maxWidth: 320)
         .padding(ASSpacing.xxl)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
+            withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
                 appeared = true
             }
         }

@@ -9,9 +9,11 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CoreDomain"),
+        .package(path: "../NotationFeature"),
+        .package(path: "../DesignSystem"),
     ],
     targets: [
-        .target(name: "PlaybackFeature", dependencies: ["CoreDomain"]),
+        .target(name: "PlaybackFeature", dependencies: ["CoreDomain", "NotationFeature", "DesignSystem"]),
         .testTarget(name: "PlaybackFeatureTests", dependencies: ["PlaybackFeature"]),
     ]
 )

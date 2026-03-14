@@ -30,9 +30,11 @@ struct SettingsView: View {
             Section("Page Turning") {
                 HStack {
                     Text("Forward Tap Zone")
+                        .font(ASTypography.body)
                     Slider(value: $tapZoneWidth, in: 0.3...0.8)
                     Text("\(Int(tapZoneWidth * 100))%")
-                        .font(ASTypography.mono)
+                        .font(ASTypography.monoSmall)
+                        .foregroundStyle(.secondary)
                         .frame(width: 40)
                 }
                 Toggle("Half-Page Turn", isOn: $isHalfPageTurnEnabled)
@@ -52,18 +54,24 @@ struct SettingsView: View {
             Section("About") {
                 HStack {
                     Text("Version")
+                        .font(ASTypography.body)
                     Spacer()
                     Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")
+                        .font(ASTypography.bodySmall)
                         .foregroundStyle(.secondary)
                 }
                 HStack {
                     Text("Build")
+                        .font(ASTypography.body)
                     Spacer()
                     Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
+                        .font(ASTypography.bodySmall)
                         .foregroundStyle(.secondary)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ASColors.chromeBackground)
         .navigationTitle("Settings")
         #if os(macOS)
         .formStyle(.grouped)
@@ -77,8 +85,10 @@ struct StorageInfoRow: View {
     var body: some View {
         HStack {
             Text("Library Size")
+                .font(ASTypography.body)
             Spacer()
             Text(storageSize)
+                .font(ASTypography.bodySmall)
                 .foregroundStyle(.secondary)
         }
         .task {

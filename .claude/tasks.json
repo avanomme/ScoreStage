@@ -357,7 +357,7 @@
       "id": "P3-001",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Build MusicXML parser and normalized score model",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P0-003"
       ],
@@ -367,7 +367,7 @@
       "id": "P3-002",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Build MEI importer (convert MEI to internal score model)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-001"
       ],
@@ -377,7 +377,7 @@
       "id": "P3-003",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Build structured measure map and timing engine",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-001"
       ],
@@ -387,7 +387,7 @@
       "id": "P3-004",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Build audio playback engine (AVAudioEngine + soundfont/MIDI)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-003"
       ],
@@ -397,7 +397,7 @@
       "id": "P3-005",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Implement playback controls (play/pause, tempo, count-in, metronome)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-004"
       ],
@@ -407,7 +407,7 @@
       "id": "P3-006",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Implement loop region and section looping (by measure, by rehearsal mark)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-005"
       ],
@@ -417,7 +417,7 @@
       "id": "P3-007",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Build mixer panel (mute/solo staves, volume balance, instrument assignment)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-004"
       ],
@@ -427,7 +427,7 @@
       "id": "P3-008",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Implement visual playhead/cursor with auto-scroll and note highlighting",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-005",
         "P1-007"
@@ -438,7 +438,7 @@
       "id": "P3-009",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Build rehearsal marks panel and playback navigation",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-001",
         "P1-013"
@@ -449,7 +449,7 @@
       "id": "P3-010",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Implement transposition-aware playback",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-004",
         "P3-001"
@@ -460,7 +460,7 @@
       "id": "P3-011",
       "phase": "Phase 3 \u2014 Structured Notation Playback",
       "title": "Write wiki documentation for Phase 3 features in docs/",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-010"
       ],

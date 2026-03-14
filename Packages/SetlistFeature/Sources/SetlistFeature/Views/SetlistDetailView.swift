@@ -52,6 +52,8 @@ public struct SetlistDetailView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ASColors.chromeBackground)
         .navigationTitle(setlist.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

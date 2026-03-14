@@ -52,10 +52,10 @@ enum LibrarySidebarItem: String, CaseIterable, Identifiable, Hashable {
     }
 
     enum SidebarSection: String, CaseIterable {
-        case library = "Library"
-        case browse = "Browse"
-        case performance = "Performance"
-        case app = "App"
+        case library = "LIBRARY"
+        case browse = "BROWSE"
+        case performance = "PERFORMANCE"
+        case app = "APP"
     }
 }
 
@@ -80,24 +80,83 @@ struct ContentView: View {
 
     private var sidebarLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $selectedItem) {
+            sidebarContent
+                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+        } detail: {
+            detailContent(for: selectedItem ?? .library)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(ASColors.chromeBackground)
+        }
+        .tint(ASColors.accentFallback)
+    }
+
+    private var sidebarContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // App title
+                Text("ScoreStage")
+                    .font(ASTypography.heading2)
+                    .foregroundStyle(ASColors.textPrimaryDark)
+                    .padding(.horizontal, ASSpacing.lg)
+                    .padding(.top, ASSpacing.xl)
+                    .padding(.bottom, ASSpacing.lg)
+
                 ForEach(LibrarySidebarItem.SidebarSection.allCases, id: \.self) { section in
                     let items = LibrarySidebarItem.allCases.filter { $0.section == section }
-                    Section(section.rawValue) {
-                        ForEach(items) { item in
-                            Label(item.title, systemImage: item.icon)
-                                .tag(item)
-                        }
-                    }
+                    sidebarSection(section, items: items)
                 }
             }
-            .navigationTitle("ScoreStage")
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
-        } detail: {
-            NavigationStack {
-                detailContent(for: selectedItem ?? .library)
+        }
+        .scrollContentBackground(.hidden)
+        .background(ASColors.chromeSurface)
+    }
+
+    @ViewBuilder
+    private func sidebarSection(_ section: LibrarySidebarItem.SidebarSection, items: [LibrarySidebarItem]) -> some View {
+        VStack(alignment: .leading, spacing: ASSpacing.xxs) {
+            // Section header
+            Text(section.rawValue)
+                .font(ASTypography.labelMicro)
+                .foregroundStyle(ASColors.textTertiaryDark)
+                .tracking(0.5)
+                .padding(.horizontal, ASSpacing.lg)
+                .padding(.top, ASSpacing.lg)
+                .padding(.bottom, ASSpacing.xs)
+
+            ForEach(items) { item in
+                sidebarRow(item)
             }
         }
+    }
+
+    private func sidebarRow(_ item: LibrarySidebarItem) -> some View {
+        let isSelected = selectedItem == item
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                selectedItem = item
+            }
+        } label: {
+            HStack(spacing: ASSpacing.md) {
+                Image(systemName: item.icon)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(isSelected ? ASColors.accentFallback : ASColors.textSecondaryDark)
+                    .frame(width: 22)
+
+                Text(item.title)
+                    .font(ASTypography.bodySmall)
+                    .foregroundStyle(isSelected ? ASColors.textPrimaryDark : ASColors.textSecondaryDark)
+
+                Spacer()
+            }
+            .padding(.horizontal, ASSpacing.md)
+            .padding(.vertical, ASSpacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                    .fill(isSelected ? ASColors.chromeSurfaceSelected : Color.clear)
+            )
+            .padding(.horizontal, ASSpacing.sm)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Compact Layout (iPhone)
@@ -123,6 +182,7 @@ struct ContentView: View {
             }
             .tabItem { Label("Settings", systemImage: "gearshape") }
         }
+        .tint(ASColors.accentFallback)
     }
     #endif
 
@@ -154,4 +214,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .preferredColorScheme(.dark)
 }

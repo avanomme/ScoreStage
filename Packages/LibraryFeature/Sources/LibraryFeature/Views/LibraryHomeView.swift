@@ -112,11 +112,13 @@ public struct LibraryHomeView: View {
                 scoreGrid(sorted)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(ASColors.chromeBackground)
         .navigationTitle(navigationTitle)
-        .searchable(text: $viewModel.searchText, prompt: "Search scores")
+        .searchable(text: $viewModel.searchText, prompt: "Search scores, composers, tags...")
         .toolbar { libraryToolbar }
         .scoreFileImporter(isPresented: $viewModel.showingImporter) { urls in
-            Task { try? await importService.importFiles(from: urls, into: modelContext) }
+            Task { let _ = try? await importService.importFiles(from: urls, into: modelContext) }
         }
         .inspector(isPresented: Binding(
             get: { viewModel.inspectedScore != nil },
@@ -132,7 +134,7 @@ public struct LibraryHomeView: View {
 
     private func scoreGrid(_ sorted: [Score]) -> some View {
         ScrollView {
-            LazyVGrid(columns: gridColumns, spacing: ASSpacing.xl) {
+            LazyVGrid(columns: gridColumns, spacing: ASSpacing.cardGap) {
                 ForEach(sorted) { score in
                     ScoreCoverCard(score: score, isSelected: viewModel.inspectedScore?.id == score.id)
                         .onTapGesture {
@@ -151,9 +153,9 @@ public struct LibraryHomeView: View {
 
     private var gridColumns: [GridItem] {
         #if os(macOS)
-        [GridItem(.adaptive(minimum: 160, maximum: 200), spacing: ASSpacing.xl)]
+        [GridItem(.adaptive(minimum: 170, maximum: 210), spacing: ASSpacing.cardGap)]
         #else
-        [GridItem(.adaptive(minimum: 140, maximum: 180), spacing: ASSpacing.lg)]
+        [GridItem(.adaptive(minimum: 140, maximum: 170), spacing: ASSpacing.lg)]
         #endif
     }
 
@@ -233,21 +235,24 @@ public struct LibraryHomeView: View {
     }
 }
 
-// MARK: - Score Cover Card (Album Art Style)
+// MARK: - Score Cover Card (Album Art Style — spec Section E.2)
 
 struct ScoreCoverCard: View {
     let score: Score
     let isSelected: Bool
     @State private var isHovering = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: ASSpacing.sm) {
             // Cover thumbnail — resembles album art / score cover
             ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color(white: 0.95), Color(white: 0.88)],
+                            colors: colorScheme == .dark
+                                ? [ASColors.cardGradientTopDark, ASColors.cardGradientBottomDark]
+                                : [ASColors.cardGradientTopLight, ASColors.cardGradientBottomLight],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -256,64 +261,66 @@ struct ScoreCoverCard: View {
                     .overlay {
                         VStack(spacing: ASSpacing.sm) {
                             Image(systemName: "music.note")
-                                .font(.system(size: 32, weight: .ultraLight))
-                                .foregroundStyle(Color(white: 0.6))
+                                .font(.system(size: 28, weight: .ultraLight))
+                                .foregroundStyle(ASColors.tertiaryText)
 
                             Text(score.title)
-                                .font(.system(size: 11, weight: .medium, design: .serif))
-                                .foregroundStyle(Color(white: 0.4))
+                                .font(ASTypography.cardTitle)
+                                .foregroundStyle(ASColors.secondaryText)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(2)
                                 .padding(.horizontal, ASSpacing.sm)
 
                             if !score.composer.isEmpty {
                                 Text(score.composer)
-                                    .font(.system(size: 9, weight: .regular))
-                                    .foregroundStyle(Color(white: 0.55))
+                                    .font(ASTypography.cardSubtitle)
+                                    .foregroundStyle(ASColors.tertiaryText)
                             }
                         }
                     }
                     .overlay(
-                        RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                        RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous)
                             .strokeBorder(
                                 isSelected ? ASColors.accentFallback : Color.clear,
                                 lineWidth: 2.5
                             )
                     )
                     .shadow(
-                        color: .black.opacity(isHovering ? 0.15 : 0.08),
-                        radius: isHovering ? 12 : 6,
+                        color: .black.opacity(isHovering ? 0.18 : 0.10),
+                        radius: isHovering ? 14 : 6,
                         y: isHovering ? 6 : 3
                     )
 
+                // Favorite badge — 24pt circle, accent at 90%
                 if score.isFavorite {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(5)
-                        .background(ASColors.accentFallback.opacity(0.85))
+                        .frame(width: 24, height: 24)
+                        .background(ASColors.accentFallback.opacity(0.9))
                         .clipShape(Circle())
-                        .padding(6)
+                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                        .padding(8)
                 }
             }
 
             // Metadata below cover
             VStack(alignment: .leading, spacing: 2) {
                 Text(score.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(ASTypography.cardMetaTitle)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 if !score.composer.isEmpty {
                     Text(score.composer)
-                        .font(.system(size: 11, weight: .regular))
+                        .font(ASTypography.cardMetaSubtitle)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
 
                 if score.duration > 0 {
                     Text(formatDuration(score.duration))
-                        .font(.system(size: 10, weight: .regular))
+                        .font(ASTypography.captionSmall)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -333,7 +340,7 @@ struct ScoreCoverCard: View {
     }
 }
 
-// MARK: - Inspector Panel
+// MARK: - Inspector Panel (spec Section E.3)
 
 struct ScoreInspectorPanel: View {
     let score: Score
@@ -341,26 +348,28 @@ struct ScoreInspectorPanel: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ASSpacing.sectionSpacing) {
-                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                // Header
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
                     Text(score.title)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(ASTypography.heading1)
 
                     if !score.composer.isEmpty {
                         Text(score.composer)
-                            .font(.system(size: 15))
+                            .font(ASTypography.body)
                             .foregroundStyle(.secondary)
                     }
 
                     if !score.arranger.isEmpty {
                         Text("arr. \(score.arranger)")
-                            .font(.system(size: 13))
+                            .font(ASTypography.bodySmall)
                             .foregroundStyle(.tertiary)
                     }
                 }
 
                 Divider()
 
-                VStack(alignment: .leading, spacing: ASSpacing.md) {
+                // Metadata rows
+                VStack(alignment: .leading, spacing: ASSpacing.inspectorRowGap) {
                     inspectorRow("Instrumentation", value: score.instrumentation)
                     inspectorRow("Genre", value: score.genre)
                     inspectorRow("Key", value: score.key)
@@ -378,20 +387,21 @@ struct ScoreInspectorPanel: View {
                     }
                 }
 
+                // Tags
                 if !score.customTags.isEmpty {
                     Divider()
                     VStack(alignment: .leading, spacing: ASSpacing.sm) {
-                        Text("Tags")
-                            .font(.system(size: 11, weight: .semibold))
+                        Text("TAGS")
+                            .font(ASTypography.labelMicro)
                             .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
+                            .tracking(0.5)
 
                         FlowLayout(spacing: ASSpacing.xs) {
                             ForEach(score.customTags, id: \.self) { tag in
                                 Text(tag)
                                     .font(.system(size: 11, weight: .medium))
-                                    .padding(.horizontal, ASSpacing.sm)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
                                     .background(ASColors.accentFallback.opacity(0.1))
                                     .clipShape(Capsule())
                             }
@@ -399,35 +409,35 @@ struct ScoreInspectorPanel: View {
                     }
                 }
 
+                // Notes
                 if !score.notes.isEmpty {
                     Divider()
                     VStack(alignment: .leading, spacing: ASSpacing.sm) {
-                        Text("Notes")
-                            .font(.system(size: 11, weight: .semibold))
+                        Text("NOTES")
+                            .font(ASTypography.labelMicro)
                             .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
+                            .tracking(0.5)
 
                         Text(score.notes)
-                            .font(.system(size: 13))
+                            .font(ASTypography.bodySmall)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-            .padding()
+            .padding(ASSpacing.screenPadding)
         }
-        .inspectorColumnWidth(min: 220, ideal: 280, max: 350)
+        .inspectorColumnWidth(min: 240, ideal: 300, max: 380)
     }
 
     @ViewBuilder
     private func inspectorRow(_ label: String, value: String) -> some View {
         if !value.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
+            VStack(alignment: .leading, spacing: ASSpacing.inspectorLabelGap) {
+                Text(label.uppercased())
+                    .font(ASTypography.labelSmall)
                     .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
                 Text(value)
-                    .font(.system(size: 13))
+                    .font(ASTypography.bodySmall)
             }
         }
     }

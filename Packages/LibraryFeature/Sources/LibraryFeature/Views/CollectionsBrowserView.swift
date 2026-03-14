@@ -28,6 +28,8 @@ public struct CollectionsBrowserView: View {
                 genresSection
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ASColors.chromeBackground)
         .navigationTitle(mode.rawValue)
     }
 
@@ -67,10 +69,10 @@ public struct CollectionsBrowserView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text(score.title)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(ASTypography.label)
                     if !score.composer.isEmpty {
                         Text(score.composer)
-                            .font(.system(size: 12))
+                            .font(ASTypography.caption)
                             .foregroundStyle(.secondary)
                     }
                 }

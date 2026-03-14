@@ -47,7 +47,7 @@ public struct ScoreReaderView: View {
         #if os(macOS)
         .onHover { hovering in
             if hovering && !showingControls {
-                withAnimation(.easeInOut(duration: 0.2)) { showingControls = true }
+                withAnimation(.easeOut(duration: 0.2)) { showingControls = true }
                 scheduleControlsHide()
             }
         }
@@ -169,7 +169,7 @@ public struct ScoreReaderView: View {
                     Task { await viewModel.previousPage() }
                 } else {
                     // Center tap toggles controls
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.easeOut(duration: 0.2)) {
                         showingControls.toggle()
                     }
                     if showingControls { scheduleControlsHide() }
@@ -177,11 +177,11 @@ public struct ScoreReaderView: View {
             }
     }
 
-    // MARK: - Floating Controls Overlay
+    // MARK: - Floating Controls Overlay (spec Section F)
 
     private var floatingControlsOverlay: some View {
         VStack {
-            // Top bar
+            // Top bar — .regularMaterial, 44pt height
             HStack {
                 Button {
                     dismiss()
@@ -192,8 +192,6 @@ public struct ScoreReaderView: View {
                 }
                 .buttonStyle(.plain)
 
-                Spacer()
-
                 Text(viewModel.score.title)
                     .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
@@ -201,17 +199,17 @@ public struct ScoreReaderView: View {
                 Spacer()
 
                 Text("\(viewModel.currentPageIndex + 1) / \(viewModel.pageCount)")
-                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .font(ASTypography.monoSmall)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, ASSpacing.lg)
-            .padding(.vertical, ASSpacing.md)
-            .background(.ultraThinMaterial)
+            .frame(height: 44)
+            .background(.regularMaterial)
 
             Spacer()
 
-            // Bottom floating control bar
-            HStack(spacing: ASSpacing.xl) {
+            // Bottom floating control bar — spec: 56pt height, radius 24pt, .regularMaterial
+            HStack(spacing: ASSpacing.cardGap) {
                 // Display mode
                 Menu {
                     Picker("Display", selection: $viewModel.displayMode) {
@@ -224,6 +222,8 @@ public struct ScoreReaderView: View {
                     controlIcon(icon: "rectangle.split.2x1", label: "Display")
                 }
 
+                controlDivider
+
                 // Paper theme — only light variants
                 Menu {
                     Picker("Paper", selection: $viewModel.paperTheme) {
@@ -234,8 +234,10 @@ public struct ScoreReaderView: View {
                     controlIcon(icon: "doc.plaintext", label: "Paper")
                 }
 
+                controlDivider
+
                 // Bookmarks
-                controlButton(icon: "bookmark", label: "Bookmarks") {}
+                controlButton(icon: "bookmark", label: "Bookmark") {}
 
                 // Performance lock
                 controlButton(icon: "lock.shield", label: "Lock") {
@@ -244,12 +246,24 @@ public struct ScoreReaderView: View {
             }
             .padding(.horizontal, ASSpacing.xl)
             .padding(.vertical, ASSpacing.md)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
-            .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+            .frame(minWidth: 280, maxWidth: 480)
+            .background(.regularMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
             .padding(.horizontal, ASSpacing.xl)
-            .padding(.bottom, ASSpacing.lg)
+            .padding(.bottom, ASSpacing.screenPadding)
         }
+    }
+
+    /// Vertical divider between control groups
+    private var controlDivider: some View {
+        Rectangle()
+            .fill(.tertiary.opacity(0.3))
+            .frame(width: 0.5, height: 28)
     }
 
     private func controlButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
@@ -262,15 +276,15 @@ public struct ScoreReaderView: View {
     private func controlIcon(icon: String, label: String) -> some View {
         VStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .light))
+                .font(.system(size: 18, weight: .regular))
             Text(label)
                 .font(.system(size: 9, weight: .medium))
         }
         .foregroundStyle(.primary)
-        .frame(minWidth: 44)
+        .frame(minWidth: 44, minHeight: 44)
     }
 
-    // MARK: - Page Number Overlay
+    // MARK: - Page Number Overlay (spec: bottom-right, monoMicro, 60% opacity)
 
     private var pageNumberOverlay: some View {
         VStack {
@@ -278,12 +292,11 @@ public struct ScoreReaderView: View {
             HStack {
                 Spacer()
                 Text("\(viewModel.currentPageIndex + 1)")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, ASSpacing.sm)
-                    .padding(.vertical, ASSpacing.xs)
+                    .font(ASTypography.monoMicro)
+                    .foregroundStyle(.tertiary.opacity(0.6))
+                    .padding(.trailing, ASSpacing.md)
+                    .padding(.bottom, ASSpacing.md)
             }
-            .padding(ASSpacing.sm)
         }
     }
 
@@ -294,7 +307,7 @@ public struct ScoreReaderView: View {
         controlsTimer = Task {
             try? await Task.sleep(for: .seconds(4))
             if !Task.isCancelled {
-                withAnimation(.easeInOut(duration: 0.25)) { showingControls = false }
+                withAnimation(.easeIn(duration: 0.25)) { showingControls = false }
             }
         }
     }

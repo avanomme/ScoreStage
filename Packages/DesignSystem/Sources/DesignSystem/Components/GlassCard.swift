@@ -10,9 +10,13 @@ public struct GlassCard<Content: View>: View {
     public var body: some View {
         content
             .padding(ASSpacing.cardPadding)
-            .background(.ultraThinMaterial)
+            .background(ASColors.chromeSurfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous))
-            .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous)
+                    .strokeBorder(ASColors.chromeBorder, lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
     }
 }
 

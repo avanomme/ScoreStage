@@ -100,6 +100,12 @@ public enum LinkMessage: Codable, Sendable {
     }
 }
 
+// MARK: - Session Holder (thread-safe reference for delegate callbacks)
+
+final class SessionHolder: @unchecked Sendable {
+    var session: MCSession?
+}
+
 // MARK: - Multipeer Session Manager
 
 /// Manages Multipeer Connectivity sessions for device linking.
@@ -119,7 +125,9 @@ public final class DeviceLinkService: NSObject {
 
     private let serviceType = "scorestage-lnk"
     private var localPeerID: MCPeerID
-    nonisolated(unsafe) private var session: MCSession?
+    private var session: MCSession?
+    /// Thread-safe reference for delegate callbacks that need the session.
+    private let sessionHolder = SessionHolder()
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
 
@@ -139,6 +147,7 @@ public final class DeviceLinkService: NSObject {
         let session = MCSession(peer: localPeerID, securityIdentity: nil, encryptionPreference: .required)
         session.delegate = self
         self.session = session
+        self.sessionHolder.session = session
     }
 
     public func startAdvertising() {
@@ -204,7 +213,7 @@ public final class DeviceLinkService: NSObject {
 
 // MARK: - MCSessionDelegate
 
-extension DeviceLinkService: @preconcurrency MCSessionDelegate {
+extension DeviceLinkService: MCSessionDelegate {
     nonisolated public func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         let name = peerID.displayName
         Task { @MainActor in
@@ -252,15 +261,15 @@ extension DeviceLinkService: @preconcurrency MCSessionDelegate {
 
 // MARK: - MCNearbyServiceAdvertiserDelegate
 
-extension DeviceLinkService: @preconcurrency MCNearbyServiceAdvertiserDelegate {
+extension DeviceLinkService: MCNearbyServiceAdvertiserDelegate {
     nonisolated public func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        invitationHandler(true, session)
+        invitationHandler(true, sessionHolder.session)
     }
 }
 
 // MARK: - MCNearbyServiceBrowserDelegate
 
-extension DeviceLinkService: @preconcurrency MCNearbyServiceBrowserDelegate {
+extension DeviceLinkService: MCNearbyServiceBrowserDelegate {
     nonisolated public func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
         let name = peerID.displayName
         Task { @MainActor in
