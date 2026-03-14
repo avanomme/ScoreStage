@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreDomain
 import DesignSystem
+import AnnotationFeature
 
 /// Reader Environment — sacred full-screen score display.
 /// No persistent toolbars. Controls appear as floating translucent overlay on interaction.
@@ -11,6 +12,7 @@ public struct ScoreReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingControls = false
     @State private var controlsTimer: Task<Void, Never>?
+    @State private var annotationState = AnnotationState()
 
     public init(score: Score, fileURL: URL, onClose: (() -> Void)? = nil) {
         self._viewModel = State(initialValue: ReaderViewModel(score: score))
@@ -31,14 +33,65 @@ public struct ScoreReaderView: View {
                 readerContent
             }
 
-            // Floating controls overlay
-            if showingControls {
+            // Annotation canvas overlay — separate layer over reader
+            if annotationState.isAnnotating {
+                AnnotationCanvasView(
+                    pageIndex: viewModel.currentPageIndex,
+                    pageSize: viewModel.pageSize(at: viewModel.currentPageIndex),
+                    state: annotationState
+                )
+                .ignoresSafeArea()
+            }
+
+            // Annotation toolbar — floating Procreate-style palette
+            if annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    AnnotationToolbarView(state: annotationState)
+                        .padding(.horizontal, ASSpacing.xl)
+                        .padding(.bottom, ASSpacing.screenPadding)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // Layer manager panel
+                if annotationState.showingLayerManager {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            LayerManagerView(state: annotationState)
+                                .frame(width: 220)
+                                .transition(.move(edge: .leading).combined(with: .opacity))
+                            Spacer()
+                        }
+                        .padding(.leading, ASSpacing.lg)
+                        .padding(.bottom, 100)
+                    }
+                }
+
+                // Stamp picker panel
+                if annotationState.showingStampPicker {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            StampPickerView(state: annotationState)
+                                .frame(width: 240)
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
+                        .padding(.trailing, ASSpacing.lg)
+                        .padding(.bottom, 100)
+                    }
+                }
+            }
+
+            // Floating controls overlay (reader mode only)
+            if showingControls && !annotationState.isAnnotating {
                 floatingControlsOverlay
                     .transition(.opacity)
             }
 
             // Page number — minimal overlay
-            if !showingControls {
+            if !showingControls && !annotationState.isAnnotating {
                 pageNumberOverlay
             }
         }
@@ -48,7 +101,7 @@ public struct ScoreReaderView: View {
         }
         #if os(macOS)
         .onHover { hovering in
-            if hovering && !showingControls {
+            if hovering && !showingControls && !annotationState.isAnnotating {
                 withAnimation(.easeOut(duration: 0.2)) { showingControls = true }
                 scheduleControlsHide()
             }
@@ -57,7 +110,7 @@ public struct ScoreReaderView: View {
         .toolbar(.hidden)
         #if os(iOS)
         .navigationBarHidden(true)
-        .statusBarHidden(!showingControls)
+        .statusBarHidden(!showingControls && !annotationState.isAnnotating)
         #endif
         .persistentSystemOverlays(.hidden)
     }
@@ -90,7 +143,7 @@ public struct ScoreReaderView: View {
         .scaleEffect(viewModel.zoomScale)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .gesture(pageTurnTapGesture(in: size))
+        .gesture(annotationState.isAnnotating ? nil : pageTurnTapGesture(in: size))
     }
 
     private var horizontalPagedView: some View {
@@ -156,7 +209,7 @@ public struct ScoreReaderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .gesture(pageTurnTapGesture(in: size))
+        .gesture(annotationState.isAnnotating ? nil : pageTurnTapGesture(in: size))
     }
 
     // MARK: - Page Turn Gesture
@@ -179,7 +232,7 @@ public struct ScoreReaderView: View {
             }
     }
 
-    // MARK: - Floating Controls Overlay (spec Section F)
+    // MARK: - Floating Controls Overlay
 
     private var floatingControlsOverlay: some View {
         VStack {
@@ -218,7 +271,7 @@ public struct ScoreReaderView: View {
 
             Spacer()
 
-            // Bottom floating control bar — spec: 56pt height, radius 24pt, .regularMaterial
+            // Bottom floating control bar
             HStack(spacing: ASSpacing.cardGap) {
                 // Display mode
                 Menu {
@@ -246,6 +299,16 @@ public struct ScoreReaderView: View {
 
                 controlDivider
 
+                // Annotate — enters annotation environment
+                controlButton(icon: "pencil.tip.crop.circle", label: "Annotate") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        annotationState.isAnnotating = true
+                        showingControls = false
+                    }
+                }
+
+                controlDivider
+
                 // Bookmarks
                 controlButton(icon: "bookmark", label: "Bookmark") {}
 
@@ -256,7 +319,7 @@ public struct ScoreReaderView: View {
             }
             .padding(.horizontal, ASSpacing.xl)
             .padding(.vertical, ASSpacing.md)
-            .frame(minWidth: 280, maxWidth: 480)
+            .frame(minWidth: 320, maxWidth: 520)
             .background(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous))
             .overlay(
@@ -294,7 +357,7 @@ public struct ScoreReaderView: View {
         .frame(minWidth: 44, minHeight: 44)
     }
 
-    // MARK: - Page Number Overlay (spec: bottom-right, monoMicro, 60% opacity)
+    // MARK: - Page Number Overlay
 
     private var pageNumberOverlay: some View {
         VStack {

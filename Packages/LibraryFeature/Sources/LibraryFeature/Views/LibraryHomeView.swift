@@ -23,11 +23,24 @@ public enum LibrarySortOrder: String, CaseIterable, Identifiable {
 
 // MARK: - View Model
 
+public enum LibraryViewMode: String, CaseIterable {
+    case grid = "Icons"
+    case list = "List"
+
+    public var icon: String {
+        switch self {
+        case .grid: "square.grid.2x2"
+        case .list: "list.bullet"
+        }
+    }
+}
+
 @MainActor
 @Observable
 public final class LibraryViewModel {
     public var searchText = ""
     public var sortOrder: LibrarySortOrder = .recent
+    public var viewMode: LibraryViewMode = .grid
     public var showingImporter = false
     public var showingScanner = false
     public var importError: String?
@@ -171,9 +184,19 @@ public struct LibraryHomeView: View {
         }
     }
 
-    // MARK: - Score Grid (Cover Art Style)
+    // MARK: - Score Grid / List
 
+    @ViewBuilder
     private func scoreGrid(_ sorted: [Score]) -> some View {
+        switch viewModel.viewMode {
+        case .grid:
+            scoreGridView(sorted)
+        case .list:
+            scoreListView(sorted)
+        }
+    }
+
+    private func scoreGridView(_ sorted: [Score]) -> some View {
         ScrollView {
             LazyVGrid(columns: gridColumns, spacing: ASSpacing.cardGap) {
                 ForEach(sorted) { score in
@@ -193,6 +216,30 @@ public struct LibraryHomeView: View {
             .animation(.easeInOut(duration: 0.25), value: viewModel.sortOrder)
             .animation(.easeInOut(duration: 0.25), value: viewModel.searchText)
         }
+    }
+
+    private func scoreListView(_ sorted: [Score]) -> some View {
+        List(sorted) { score in
+            ScoreListRow(score: score, isSelected: viewModel.inspectedScore?.id == score.id)
+                .listRowInsets(EdgeInsets(top: 4, leading: ASSpacing.md, bottom: 4, trailing: ASSpacing.md))
+                .listRowSeparator(.hidden)
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                        .fill(viewModel.inspectedScore?.id == score.id ? ASColors.chromeSurfaceSelected : Color.clear)
+                        .padding(.horizontal, ASSpacing.xs)
+                )
+                .onTapGesture(count: 2) {
+                    viewModel.scoreToOpen = score
+                }
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.inspectedScore = score
+                    }
+                }
+                .contextMenu { scoreContextMenu(for: score) }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private var gridColumns: [GridItem] {
@@ -224,6 +271,15 @@ public struct LibraryHomeView: View {
             } label: {
                 Label("Add", systemImage: "plus")
             }
+        }
+        ToolbarItem {
+            Picker("View", selection: $viewModel.viewMode) {
+                ForEach(LibraryViewMode.allCases, id: \.self) { mode in
+                    Image(systemName: mode.icon).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 80)
         }
         ToolbarItem {
             Menu {
@@ -398,6 +454,72 @@ struct ScoreCoverCard: View {
         let mins = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return secs > 0 ? "\(mins):\(String(format: "%02d", secs))" : "\(mins) min"
+    }
+}
+
+// MARK: - Score List Row
+
+struct ScoreListRow: View {
+    let score: Score
+    let isSelected: Bool
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: ASSpacing.md) {
+            // Compact thumbnail
+            RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                .fill(ASColors.chromeSurface)
+                .frame(width: 40, height: 52)
+                .overlay {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 14, weight: .ultraLight))
+                        .foregroundStyle(ASColors.tertiaryText)
+                }
+
+            // Title + composer
+            VStack(alignment: .leading, spacing: 2) {
+                Text(score.title)
+                    .font(ASTypography.bodySmall)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if !score.composer.isEmpty {
+                    Text(score.composer)
+                        .font(ASTypography.captionSmall)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            // Genre tag
+            if !score.genre.isEmpty {
+                Text(score.genre)
+                    .font(ASTypography.captionSmall)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            // Page count
+            if score.pageCount > 0 {
+                Text("\(score.pageCount) pg")
+                    .font(ASTypography.monoMicro)
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 40, alignment: .trailing)
+            }
+
+            // Favorite indicator
+            if score.isFavorite {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(ASColors.accentFallback)
+            }
+        }
+        .padding(.vertical, ASSpacing.xs)
+        .contentShape(Rectangle())
+        .opacity(isHovering ? 0.85 : 1.0)
+        .onHover { isHovering = $0 }
     }
 }
 

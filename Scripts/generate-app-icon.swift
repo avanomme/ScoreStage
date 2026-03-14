@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Icon Design
 // Dark background (#1A1A1E) with rose copper accent (#D55D7A)
-// Musical staff lines + stylized music note/stand
+// Large prominent music note filling the icon
 
 let bgColor = (r: 0x1A/255.0, g: 0x1A/255.0, b: 0x1E/255.0)
 let accentColor = (r: 213.0/255.0, g: 93.0/255.0, b: 122.0/255.0)
@@ -33,53 +33,52 @@ func generateIcon(size: Int) -> CGImage? {
 
     let unit = s / 1024.0
 
-    // Background — dark with subtle gradient feel
+    // Background — dark
     ctx.setFillColor(CGColor(red: bgColor.r, green: bgColor.g, blue: bgColor.b, alpha: 1))
     ctx.fill(CGRect(x: 0, y: 0, width: s, height: s))
 
     // Subtle radial gradient overlay for depth
     let gradientColors = [
-        CGColor(red: 0x22/255.0, green: 0x22/255.0, blue: 0x28/255.0, alpha: 1.0),
+        CGColor(red: 0x24/255.0, green: 0x22/255.0, blue: 0x2A/255.0, alpha: 1.0),
         CGColor(red: bgColor.r, green: bgColor.g, blue: bgColor.b, alpha: 1.0)
     ] as CFArray
     if let gradient = CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: [0, 1]) {
         ctx.drawRadialGradient(
             gradient,
-            startCenter: CGPoint(x: s * 0.5, y: s * 0.4),
+            startCenter: CGPoint(x: s * 0.45, y: s * 0.4),
             startRadius: 0,
             endCenter: CGPoint(x: s * 0.5, y: s * 0.5),
-            endRadius: s * 0.7,
+            endRadius: s * 0.75,
             options: .drawsAfterEndLocation
         )
     }
 
-    // Staff lines — 5 thin horizontal lines (like a musical staff)
-    let staffTop = s * 0.35
-    let staffSpacing = s * 0.065
-    let staffLineWidth = max(1.0, unit * 2.0)
-    let staffLeft = s * 0.15
-    let staffRight = s * 0.85
+    // Subtle staff lines behind the note — very faint background texture
+    let staffTop = s * 0.28
+    let staffSpacing = s * 0.11
+    let staffLineWidth = max(1.0, unit * 1.5)
 
-    ctx.setStrokeColor(CGColor(red: lightColor.r, green: lightColor.g, blue: lightColor.b, alpha: 0.15))
+    ctx.setStrokeColor(CGColor(red: lightColor.r, green: lightColor.g, blue: lightColor.b, alpha: 0.08))
     ctx.setLineWidth(staffLineWidth)
 
     for i in 0..<5 {
         let y = staffTop + CGFloat(i) * staffSpacing
-        ctx.move(to: CGPoint(x: staffLeft, y: y))
-        ctx.addLine(to: CGPoint(x: staffRight, y: y))
+        ctx.move(to: CGPoint(x: s * 0.05, y: y))
+        ctx.addLine(to: CGPoint(x: s * 0.95, y: y))
     }
     ctx.strokePath()
 
-    // Main note — a stylized quarter note in accent color
-    let noteHeadCenterX = s * 0.45
-    let noteHeadCenterY = staffTop + 3 * staffSpacing  // sits on 4th staff line
-    let noteHeadRx = s * 0.075 // horizontal radius (oval)
-    let noteHeadRy = s * 0.055 // vertical radius
+    // ── Large prominent quarter note ──
+    // Note head center — positioned in lower-center of icon
+    let noteHeadCenterX = s * 0.42
+    let noteHeadCenterY = s * 0.65
+    let noteHeadRx = s * 0.16  // wide oval
+    let noteHeadRy = s * 0.12  // shorter vertically
 
-    // Note head (filled oval, slightly tilted)
+    // Note head — filled oval, slightly tilted
     ctx.saveGState()
     ctx.translateBy(x: noteHeadCenterX, y: noteHeadCenterY)
-    ctx.rotate(by: -0.3) // slight tilt like real notation
+    ctx.rotate(by: -0.35)
     ctx.setFillColor(CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 1))
     ctx.fillEllipse(in: CGRect(
         x: -noteHeadRx, y: -noteHeadRy,
@@ -87,11 +86,11 @@ func generateIcon(size: Int) -> CGImage? {
     ))
     ctx.restoreGState()
 
-    // Stem — vertical line from note head going up
-    let stemWidth = max(2.0, unit * 4.0)
-    let stemX = noteHeadCenterX + noteHeadRx * 0.85
-    let stemBottom = noteHeadCenterY - noteHeadRy * 0.3
-    let stemTop = staffTop - s * 0.06
+    // Stem — tall vertical line from note head to near top
+    let stemWidth = max(3.0, unit * 8.0)
+    let stemX = noteHeadCenterX + noteHeadRx * 0.82
+    let stemBottom = noteHeadCenterY - noteHeadRy * 0.5
+    let stemTop = s * 0.12
 
     ctx.setStrokeColor(CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 1))
     ctx.setLineWidth(stemWidth)
@@ -100,59 +99,46 @@ func generateIcon(size: Int) -> CGImage? {
     ctx.addLine(to: CGPoint(x: stemX, y: stemTop))
     ctx.strokePath()
 
-    // Flag — curved line from top of stem
-    let flagStartY = stemTop
-    let flagEndX = stemX + s * 0.1
-    let flagEndY = stemTop + s * 0.12
-    let flagCtrl1X = stemX + s * 0.12
-    let flagCtrl1Y = stemTop + s * 0.02
-    let flagCtrl2X = stemX + s * 0.08
-    let flagCtrl2Y = stemTop + s * 0.10
+    // Flag — elegant curved stroke from top of stem
+    let flagLineWidth = max(3.0, unit * 7.0)
+    ctx.setLineWidth(flagLineWidth)
+    ctx.setLineCap(.round)
 
-    ctx.setLineWidth(max(2.0, unit * 3.5))
-    ctx.move(to: CGPoint(x: stemX, y: flagStartY))
+    // First flag
+    ctx.move(to: CGPoint(x: stemX, y: stemTop))
     ctx.addCurve(
-        to: CGPoint(x: flagEndX, y: flagEndY),
-        control1: CGPoint(x: flagCtrl1X, y: flagCtrl1Y),
-        control2: CGPoint(x: flagCtrl2X, y: flagCtrl2Y)
+        to: CGPoint(x: stemX + s * 0.18, y: stemTop + s * 0.22),
+        control1: CGPoint(x: stemX + s * 0.22, y: stemTop + s * 0.04),
+        control2: CGPoint(x: stemX + s * 0.14, y: stemTop + s * 0.18)
     )
     ctx.strokePath()
 
-    // Second smaller note — creates a pair (eighth note feel)
-    let note2HeadCenterX = s * 0.58
-    let note2HeadCenterY = staffTop + 1.5 * staffSpacing  // higher on staff
-    let note2HeadRx = s * 0.06
-    let note2HeadRy = s * 0.045
-
-    ctx.saveGState()
-    ctx.translateBy(x: note2HeadCenterX, y: note2HeadCenterY)
-    ctx.rotate(by: -0.3)
-    ctx.setFillColor(CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 0.7))
-    ctx.fillEllipse(in: CGRect(
-        x: -note2HeadRx, y: -note2HeadRy,
-        width: note2HeadRx * 2, height: note2HeadRy * 2
-    ))
-    ctx.restoreGState()
-
-    // Stem for second note
-    let stem2X = note2HeadCenterX + note2HeadRx * 0.85
-    let stem2Bottom = note2HeadCenterY - note2HeadRy * 0.3
-    let stem2Top = note2HeadCenterY - s * 0.18
-
-    ctx.setStrokeColor(CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 0.7))
-    ctx.setLineWidth(max(1.5, unit * 3.0))
-    ctx.move(to: CGPoint(x: stem2X, y: stem2Bottom))
-    ctx.addLine(to: CGPoint(x: stem2X, y: stem2Top))
+    // Second flag (eighth note → sixteenth note feel)
+    ctx.move(to: CGPoint(x: stemX, y: stemTop + s * 0.08))
+    ctx.addCurve(
+        to: CGPoint(x: stemX + s * 0.16, y: stemTop + s * 0.28),
+        control1: CGPoint(x: stemX + s * 0.20, y: stemTop + s * 0.12),
+        control2: CGPoint(x: stemX + s * 0.12, y: stemTop + s * 0.24)
+    )
     ctx.strokePath()
 
-    // Accent bar at bottom — subtle brand line
-    let barHeight = s * 0.008
-    let barY = s * 0.92
-    let barLeft = s * 0.3
-    let barRight = s * 0.7
-
-    ctx.setFillColor(CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 0.6))
-    ctx.fill(CGRect(x: barLeft, y: barY, width: barRight - barLeft, height: barHeight))
+    // Subtle glow behind the note head for depth
+    ctx.saveGState()
+    let glowColors = [
+        CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 0.15),
+        CGColor(red: accentColor.r, green: accentColor.g, blue: accentColor.b, alpha: 0.0)
+    ] as CFArray
+    if let glow = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0, 1]) {
+        ctx.drawRadialGradient(
+            glow,
+            startCenter: CGPoint(x: noteHeadCenterX, y: noteHeadCenterY),
+            startRadius: s * 0.1,
+            endCenter: CGPoint(x: noteHeadCenterX, y: noteHeadCenterY),
+            endRadius: s * 0.3,
+            options: .drawsAfterEndLocation
+        )
+    }
+    ctx.restoreGState()
 
     return ctx.makeImage()
 }
