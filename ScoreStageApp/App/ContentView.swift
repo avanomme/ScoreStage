@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import DesignSystem
 import LibraryFeature
+import ReaderFeature
 import SetlistFeature
 import CoreDomain
 
@@ -62,7 +63,11 @@ enum LibrarySidebarItem: String, CaseIterable, Identifiable, Hashable {
 struct ContentView: View {
     @State private var selectedItem: LibrarySidebarItem? = .library
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var scoreToOpen: Score?
+    @State private var readerFileURL: URL?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private let importService = ScoreImportService()
 
     var body: some View {
         #if os(iOS)
@@ -88,6 +93,20 @@ struct ContentView: View {
                 .background(ASColors.chromeBackground)
         }
         .tint(ASColors.accentFallback)
+        #if os(iOS)
+        .fullScreenCover(item: $scoreToOpen) { score in
+            if let url = readerFileURL {
+                ScoreReaderView(score: score, fileURL: url)
+            }
+        }
+        #else
+        .sheet(item: $scoreToOpen) { score in
+            if let url = readerFileURL {
+                ScoreReaderView(score: score, fileURL: url)
+                    .frame(minWidth: 800, minHeight: 600)
+            }
+        }
+        #endif
     }
 
     private var sidebarContent: some View {
@@ -165,7 +184,7 @@ struct ContentView: View {
     private var compactLayout: some View {
         TabView {
             NavigationStack {
-                LibraryHomeView(filter: .all)
+                LibraryHomeView(filter: .all, onOpen: openScore)
             }
             .tabItem { Label("Library", systemImage: "music.note.list") }
 
@@ -183,6 +202,11 @@ struct ContentView: View {
             .tabItem { Label("Settings", systemImage: "gearshape") }
         }
         .tint(ASColors.accentFallback)
+        .fullScreenCover(item: $scoreToOpen) { score in
+            if let url = readerFileURL {
+                ScoreReaderView(score: score, fileURL: url)
+            }
+        }
     }
     #endif
 
@@ -192,11 +216,11 @@ struct ContentView: View {
     private func detailContent(for item: LibrarySidebarItem) -> some View {
         switch item {
         case .library:
-            LibraryHomeView(filter: .all)
+            LibraryHomeView(filter: .all, onOpen: openScore)
         case .recentlyPlayed:
-            LibraryHomeView(filter: .recentlyPlayed)
+            LibraryHomeView(filter: .recentlyPlayed, onOpen: openScore)
         case .favorites:
-            LibraryHomeView(filter: .favorites)
+            LibraryHomeView(filter: .favorites, onOpen: openScore)
         case .composers:
             CollectionsBrowserView(mode: .composers)
         case .genres:
@@ -208,6 +232,27 @@ struct ContentView: View {
                 }
         case .settings:
             SettingsView()
+        }
+    }
+
+    // MARK: - Open Score
+
+    private func openScore(_ score: Score) {
+        guard let primaryAsset = score.assets.first(where: { $0.isPrimary }) ?? score.assets.first else { return }
+        do {
+            let url = try importService.fileURL(for: primaryAsset)
+            score.lastOpenedAt = Date()
+            readerFileURL = url
+            scoreToOpen = score
+        } catch {
+            // File not found — could show alert
+        }
+    }
+
+    @ViewBuilder
+    private var readerPresentation: some View {
+        if let score = scoreToOpen, let url = readerFileURL {
+            ScoreReaderView(score: score, fileURL: url)
         }
     }
 }

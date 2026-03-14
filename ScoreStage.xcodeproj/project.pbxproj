@@ -22,14 +22,17 @@
 		6589CD666E49A314E928BB5D /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = CDB76905AC76C08AE55CE1E0 /* SetlistFeature */; };
 		680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */; };
 		6B9984F176BE980F4304A1D7 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 718BCE056C508C1B5C9D5B03 /* LibraryFeature */; };
+		7661CF385277261087C4D48B /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2AFDECD528BD44B6C834AB /* PaywallView.swift */; };
 		7FCF73518E566DC6D95D1E7D /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 559D35A7A0CBD41E0FDB2292 /* ReaderFeature */; };
 		805521FA481AAE7B10DC44F2 /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 0C51E0C0D46C09DD3BD1FB57 /* ReaderFeature */; };
+		80AD6678CA639845B75E534F /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2AFDECD528BD44B6C834AB /* PaywallView.swift */; };
 		82213D85533142368ABCA6E9 /* AnnotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA299D5A6BF1513D0BDE06BE /* AnnotationFeature */; };
 		866997E44245B9EB56305928 /* PlaybackFeature in Frameworks */ = {isa = PBXBuildFile; productRef = E46D0FA2DFFDAD48B0D2B141 /* PlaybackFeature */; };
 		89B2F7E7EBF8FA2471DB5B46 /* DeviceLinkFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 4C3A41643899104787707B05 /* DeviceLinkFeature */; };
 		916BBC2A1942B2C84D22C186 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 70A54EFE33150B6AECA9F176 /* LibraryFeature */; };
 		92CF975F56699624DE1619E5 /* PlaybackFeature in Frameworks */ = {isa = PBXBuildFile; productRef = DC216D20D29BAED275586E15 /* PlaybackFeature */; };
 		9513B297C3DEBB5BFFF7690E /* DeviceLinkFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 9836F382E3C1DF68F46F6271 /* DeviceLinkFeature */; };
+		95BBA72EA4508BA9C63C58FA /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */; };
 		A1091AD690088F7D46102B1A /* NotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 0D8E8CAE3CB11D7DB1B99057 /* NotationFeature */; };
 		A5B905C6DC602C5BFCA3C28D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E5B7285B9693CCD387E6BCE /* Assets.xcassets */; };
 		A618E7E57AFED287F7969AD5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC890328F2B3C396AC4214D4 /* ContentView.swift */; };
@@ -39,8 +42,11 @@
 		B6F0E04A2E31012653BA74D8 /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = D52AEF3DD4DE89184F54EEB6 /* InputTrackingFeature */; };
 		BDD95AC299CB38CD0737BA16 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = E4D945420D309B3E964B3063 /* DesignSystem */; };
 		C448BCAAC459364E21C9CC77 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 01D5840787D395FC83A9B098 /* DesignSystem */; };
+		C64445B0A4903C7455C2F876 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C19E309A510733E25407B27 /* AnalyticsService.swift */; };
+		DEC8FCE83B1354BFE7A116F9 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C19E309A510733E25407B27 /* AnalyticsService.swift */; };
 		E715E7F5DAFF9B3E6D7E2A7A /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 14C5834787FBEEE864C16EA9 /* InputTrackingFeature */; };
 		F8C735DA53DFFF6D94B3088A /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C803733B8F4FAEAF47BCDF97 /* CoreDomain */; };
+		FF36CD4677D93A159FC09564 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +63,7 @@
 		022F7216AEF9F79761BDCDDD /* ScoreStage-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "ScoreStage-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		09AA1E7469C8989249819B40 /* ScoreStage-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ScoreStage-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B1AF3CA42303AB77DADAD5A /* ScoreStage.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ScoreStage.entitlements; sourceTree = "<group>"; };
+		0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreService.swift; sourceTree = "<group>"; };
 		1F24DE759136043B296DC774 /* ScoreStageApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreStageApp.swift; sourceTree = "<group>"; };
 		56C4AD745588633BC44FE669 /* SetlistFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SetlistFeature; path = Packages/SetlistFeature; sourceTree = SOURCE_ROOT; };
 		595BBFE8D25A7F8D2230BDDC /* InputTrackingFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = InputTrackingFeature; path = Packages/InputTrackingFeature; sourceTree = SOURCE_ROOT; };
@@ -70,6 +77,8 @@
 		7C203E0EDE018F74E6BCA18B /* PlaybackFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PlaybackFeature; path = Packages/PlaybackFeature; sourceTree = SOURCE_ROOT; };
 		86691D2D6488DAE0D06E02F8 /* ReaderFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ReaderFeature; path = Packages/ReaderFeature; sourceTree = SOURCE_ROOT; };
 		8B2CE0C68291BE92C252BCD1 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8C19E309A510733E25407B27 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
+		AC2AFDECD528BD44B6C834AB /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		AC39E17927441C0DAF6C6FB8 /* LibraryFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LibraryFeature; path = Packages/LibraryFeature; sourceTree = SOURCE_ROOT; };
 		B5F69EDE4E68E2FC717AEEDC /* DeviceLinkFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DeviceLinkFeature; path = Packages/DeviceLinkFeature; sourceTree = SOURCE_ROOT; };
 		C0C5CC5F8CF6FF758798936E /* SyncFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SyncFeature; path = Packages/SyncFeature; sourceTree = SOURCE_ROOT; };
@@ -148,10 +157,13 @@
 		36583FFEAD7D29918B5A65C6 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				8C19E309A510733E25407B27 /* AnalyticsService.swift */,
 				CC890328F2B3C396AC4214D4 /* ContentView.swift */,
 				61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */,
+				AC2AFDECD528BD44B6C834AB /* PaywallView.swift */,
 				1F24DE759136043B296DC774 /* ScoreStageApp.swift */,
 				8B2CE0C68291BE92C252BCD1 /* SettingsView.swift */,
+				0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -366,10 +378,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DEC8FCE83B1354BFE7A116F9 /* AnalyticsService.swift in Sources */,
 				639671C2C5CBB6E3207A2984 /* ContentView.swift in Sources */,
 				3523EB753652F366CECD5EFF /* OnboardingView.swift in Sources */,
+				80AD6678CA639845B75E534F /* PaywallView.swift in Sources */,
 				5CDEA5E8E0FDC04DC7076AE7 /* ScoreStageApp.swift in Sources */,
 				A820835933EC74564333976A /* SettingsView.swift in Sources */,
+				FF36CD4677D93A159FC09564 /* StoreService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -377,10 +392,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C64445B0A4903C7455C2F876 /* AnalyticsService.swift in Sources */,
 				A618E7E57AFED287F7969AD5 /* ContentView.swift in Sources */,
 				680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */,
+				7661CF385277261087C4D48B /* PaywallView.swift in Sources */,
 				423580C68836CC111D590B4C /* ScoreStageApp.swift in Sources */,
 				3AC9980BA25ABD095CF9DF19 /* SettingsView.swift in Sources */,
+				95BBA72EA4508BA9C63C58FA /* StoreService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

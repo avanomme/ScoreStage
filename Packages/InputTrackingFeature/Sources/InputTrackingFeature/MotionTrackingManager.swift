@@ -171,7 +171,7 @@ public final class MotionTrackingManager: ObservableObject {
         let state = UIDevice.current.batteryState
         let level = UIDevice.current.batteryLevel
         // Constrain when unplugged and below 20%
-        isBatteryConstrained = (state == .unplugging || state == .unknown) && level < 0.2 && level >= 0
+        isBatteryConstrained = (state == .unplugged || state == .unknown) && level < 0.2 && level >= 0
     }
     #endif
 

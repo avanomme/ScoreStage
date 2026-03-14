@@ -40,7 +40,7 @@ public final class StoreService {
 
     // MARK: - Private
 
-    private var updateListenerTask: Task<Void, Never>?
+    private nonisolated(unsafe) var updateListenerTask: Task<Void, Never>?
 
     public init() {
         updateListenerTask = listenForTransactions()

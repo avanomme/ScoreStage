@@ -29,7 +29,11 @@ public final class LibraryViewModel {
     public var searchText = ""
     public var sortOrder: LibrarySortOrder = .recent
     public var showingImporter = false
+    public var showingScanner = false
+    public var importError: String?
     public var inspectedScore: Score?
+    /// Set when user wants to open a score (double-tap / context menu).
+    public var scoreToOpen: Score?
 
     public init() {}
 
@@ -76,9 +80,11 @@ public struct LibraryHomeView: View {
     @State private var viewModel = LibraryViewModel()
     private let importService = ScoreImportService()
     private let filter: LibraryFilter
+    private let onOpen: ((Score) -> Void)?
 
-    public init(filter: LibraryFilter = .all) {
+    public init(filter: LibraryFilter = .all, onOpen: ((Score) -> Void)? = nil) {
         self.filter = filter
+        self.onOpen = onOpen
     }
 
     private var navigationTitle: String {
@@ -118,7 +124,42 @@ public struct LibraryHomeView: View {
         .searchable(text: $viewModel.searchText, prompt: "Search scores, composers, tags...")
         .toolbar { libraryToolbar }
         .scoreFileImporter(isPresented: $viewModel.showingImporter) { urls in
-            Task { let _ = try? await importService.importFiles(from: urls, into: modelContext) }
+            Task {
+                do {
+                    let _ = try await importService.importFiles(from: urls, into: modelContext)
+                } catch {
+                    viewModel.importError = error.localizedDescription
+                }
+            }
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $viewModel.showingScanner) {
+            ScoreScannerView { scannedPDFURL in
+                Task {
+                    do {
+                        let _ = try await importService.importSingleFile(from: scannedPDFURL, into: modelContext)
+                    } catch {
+                        viewModel.importError = error.localizedDescription
+                    }
+                }
+            }
+        }
+        #endif
+        .alert("Import Error", isPresented: Binding(
+            get: { viewModel.importError != nil },
+            set: { if !$0 { viewModel.importError = nil } }
+        )) {
+            Button("OK") { viewModel.importError = nil }
+        } message: {
+            if let error = viewModel.importError {
+                Text(error)
+            }
+        }
+        .onChange(of: viewModel.scoreToOpen?.id) { _, newValue in
+            if let score = viewModel.scoreToOpen {
+                viewModel.scoreToOpen = nil
+                onOpen?(score)
+            }
         }
         .inspector(isPresented: Binding(
             get: { viewModel.inspectedScore != nil },
@@ -137,6 +178,9 @@ public struct LibraryHomeView: View {
             LazyVGrid(columns: gridColumns, spacing: ASSpacing.cardGap) {
                 ForEach(sorted) { score in
                     ScoreCoverCard(score: score, isSelected: viewModel.inspectedScore?.id == score.id)
+                        .onTapGesture(count: 2) {
+                            viewModel.scoreToOpen = score
+                        }
                         .onTapGesture {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 viewModel.inspectedScore = score
@@ -164,10 +208,21 @@ public struct LibraryHomeView: View {
     @ToolbarContentBuilder
     private var libraryToolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Button {
-                viewModel.showingImporter = true
+            Menu {
+                Button {
+                    viewModel.showingImporter = true
+                } label: {
+                    Label("Import Files", systemImage: "doc.badge.plus")
+                }
+                #if os(iOS)
+                Button {
+                    viewModel.showingScanner = true
+                } label: {
+                    Label("Scan Score", systemImage: "camera")
+                }
+                #endif
             } label: {
-                Label("Import", systemImage: "plus")
+                Label("Add", systemImage: "plus")
             }
         }
         ToolbarItem {
@@ -187,6 +242,12 @@ public struct LibraryHomeView: View {
 
     @ViewBuilder
     private func scoreContextMenu(for score: Score) -> some View {
+        Button {
+            viewModel.scoreToOpen = score
+        } label: {
+            Label("Open", systemImage: "book.pages")
+        }
+        Divider()
         Button {
             score.isFavorite.toggle()
         } label: {

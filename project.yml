@@ -74,6 +74,9 @@ targets:
       path: ScoreStageApp/ScoreStage.entitlements
       properties:
         com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.device.camera: true
+        com.apple.security.device.audio-input: true
 
   ScoreStage-macOS:
     type: application
@@ -105,6 +108,11 @@ targets:
       path: ScoreStageApp/ScoreStage.entitlements
       properties:
         com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.downloads.read-write: true
+        com.apple.security.network.client: true
+        com.apple.security.device.camera: true
+        com.apple.security.device.audio-input: true
 
   ScoreStageTests:
     type: bundle.unit-test
