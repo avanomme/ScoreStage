@@ -470,7 +470,7 @@
       "id": "P4-001",
       "phase": "Phase 4 \u2014 Motion / Head / Eye Page Turning",
       "title": "Build head movement tracking for page turns (Vision framework / ARKit)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-007"
       ],
@@ -480,7 +480,7 @@
       "id": "P4-002",
       "phase": "Phase 4 \u2014 Motion / Head / Eye Page Turning",
       "title": "Build eye gaze / gaze dwell page-turning",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P4-001"
       ],
@@ -490,7 +490,7 @@
       "id": "P4-003",
       "phase": "Phase 4 \u2014 Motion / Head / Eye Page Turning",
       "title": "Build calibration and training screen for motion-based turning",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P4-001"
       ],
@@ -500,7 +500,7 @@
       "id": "P4-004",
       "phase": "Phase 4 \u2014 Motion / Head / Eye Page Turning",
       "title": "Implement safety controls (debounce, confidence threshold, accessibility fallback)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P4-001",
         "P4-002"
@@ -511,7 +511,7 @@
       "id": "P4-005",
       "phase": "Phase 4 \u2014 Motion / Head / Eye Page Turning",
       "title": "Write wiki documentation for Phase 4 features in docs/",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P4-004"
       ],
@@ -521,7 +521,7 @@
       "id": "P5-001",
       "phase": "Phase 5 \u2014 Advanced Musical Intelligence",
       "title": "Implement jump logic for navigation links (coda, DS, DC, repeats)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P1-013",
         "P3-001"
@@ -532,7 +532,7 @@
       "id": "P5-002",
       "phase": "Phase 5 \u2014 Advanced Musical Intelligence",
       "title": "Build score family linking (full score + parts, alternate editions)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P0-003"
       ],
@@ -542,7 +542,7 @@
       "id": "P5-003",
       "phase": "Phase 5 \u2014 Advanced Musical Intelligence",
       "title": "Implement cross-device Handoff and session continuity",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P2-006",
         "P1-014"
@@ -553,7 +553,7 @@
       "id": "P5-004",
       "phase": "Phase 5 \u2014 Advanced Musical Intelligence",
       "title": "Build MIDI keyboard input comparison (practice feedback)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P3-004"
       ],
@@ -563,7 +563,7 @@
       "id": "P5-005",
       "phase": "Phase 5 \u2014 Advanced Musical Intelligence",
       "title": "Research and prototype score-following (microphone/MIDI)",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P5-004",
         "P3-003"
@@ -574,7 +574,7 @@
       "id": "P5-006",
       "phase": "Phase 5 \u2014 Advanced Musical Intelligence",
       "title": "Write wiki documentation for Phase 5 features in docs/",
-      "status": "pending",
+      "status": "done",
       "depends": [
         "P5-005"
       ],

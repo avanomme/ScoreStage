@@ -5,11 +5,25 @@ import DesignSystem
 
 @main
 struct ScoreStageApp: App {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showOnboarding = false
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.dark)
                 .background(ASColors.chromeBackground)
+                .fullScreenCover(isPresented: $showOnboarding) {
+                    OnboardingView {
+                        showOnboarding = false
+                    }
+                    .preferredColorScheme(.dark)
+                }
+                .onAppear {
+                    if !hasCompletedOnboarding {
+                        showOnboarding = true
+                    }
+                }
         }
         #if os(macOS)
         .windowStyle(.hiddenTitleBar)

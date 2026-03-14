@@ -10,6 +10,7 @@
 		068D5A3BBC10A328C1E1CA5D /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = F4D4AD4C54CC98827868B451 /* CoreDomain */; };
 		19B892337E1F966B6F382455 /* AnnotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = ADA971AFC20E7F8205BD14EC /* AnnotationFeature */; };
 		1AAC0BB093B3D376E76D2405 /* SyncFeature in Frameworks */ = {isa = PBXBuildFile; productRef = E107029463CF13117DAE64C0 /* SyncFeature */; };
+		3523EB753652F366CECD5EFF /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */; };
 		368898ACA98B752A9AF8ECF9 /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 3B36979412553F7CBC240F62 /* CoreDomain */; };
 		3A9322074186841C69B46367 /* ScoreStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCD611DDE4919AD924DC042 /* ScoreStageTests.swift */; };
 		3AC9980BA25ABD095CF9DF19 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2CE0C68291BE92C252BCD1 /* SettingsView.swift */; };
@@ -19,6 +20,7 @@
 		5F9E9AA68A3CDFF6ECC5F3FE /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = B31F5C39D978E876782944C8 /* SetlistFeature */; };
 		639671C2C5CBB6E3207A2984 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC890328F2B3C396AC4214D4 /* ContentView.swift */; };
 		6589CD666E49A314E928BB5D /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = CDB76905AC76C08AE55CE1E0 /* SetlistFeature */; };
+		680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */; };
 		6B9984F176BE980F4304A1D7 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 718BCE056C508C1B5C9D5B03 /* LibraryFeature */; };
 		7FCF73518E566DC6D95D1E7D /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 559D35A7A0CBD41E0FDB2292 /* ReaderFeature */; };
 		805521FA481AAE7B10DC44F2 /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 0C51E0C0D46C09DD3BD1FB57 /* ReaderFeature */; };
@@ -60,6 +62,7 @@
 		595BBFE8D25A7F8D2230BDDC /* InputTrackingFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = InputTrackingFeature; path = Packages/InputTrackingFeature; sourceTree = SOURCE_ROOT; };
 		5E5B7285B9693CCD387E6BCE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		61B85467299C5F689456F8FF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		6BCAF7B0338AE4B042F36DB4 /* NotationFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NotationFeature; path = Packages/NotationFeature; sourceTree = SOURCE_ROOT; };
 		72B28B8A823D4F1B1D42F76A /* ScoreStageTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ScoreStageTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7887802C0F7C31F1DAC8C998 /* DesignSystem */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DesignSystem; path = Packages/DesignSystem; sourceTree = SOURCE_ROOT; };
@@ -146,6 +149,7 @@
 			isa = PBXGroup;
 			children = (
 				CC890328F2B3C396AC4214D4 /* ContentView.swift */,
+				61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */,
 				1F24DE759136043B296DC774 /* ScoreStageApp.swift */,
 				8B2CE0C68291BE92C252BCD1 /* SettingsView.swift */,
 			);
@@ -363,6 +367,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				639671C2C5CBB6E3207A2984 /* ContentView.swift in Sources */,
+				3523EB753652F366CECD5EFF /* OnboardingView.swift in Sources */,
 				5CDEA5E8E0FDC04DC7076AE7 /* ScoreStageApp.swift in Sources */,
 				A820835933EC74564333976A /* SettingsView.swift in Sources */,
 			);
@@ -373,6 +378,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A618E7E57AFED287F7969AD5 /* ContentView.swift in Sources */,
+				680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */,
 				423580C68836CC111D590B4C /* ScoreStageApp.swift in Sources */,
 				3AC9980BA25ABD095CF9DF19 /* SettingsView.swift in Sources */,
 			);

@@ -9,9 +9,10 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CoreDomain"),
+        .package(path: "../DesignSystem"),
     ],
     targets: [
-        .target(name: "InputTrackingFeature", dependencies: ["CoreDomain"]),
+        .target(name: "InputTrackingFeature", dependencies: ["CoreDomain", "DesignSystem"]),
         .testTarget(name: "InputTrackingFeatureTests", dependencies: ["InputTrackingFeature"]),
     ]
 )

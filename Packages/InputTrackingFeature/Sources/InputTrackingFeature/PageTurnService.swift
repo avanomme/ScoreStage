@@ -14,6 +14,8 @@ public final class PageTurnService: ObservableObject, @unchecked Sendable {
         case swipe
         case keyboard
         case pedal
+        case headMovement
+        case eyeGaze
     }
 
     @Published public var lastTurnDirection: TurnDirection?
