@@ -43,10 +43,13 @@ public final class PlaybackEngine {
     private var metronomePlayer: AVAudioPlayerNode?
     private var events: [PlaybackEvent] = []
     private var measureMap: MeasureMap?
+    private var score: NormalizedScore?
     private var playbackTask: Task<Void, Never>?
     private var eventIndex: Int = 0
     private var startTimestamp: Date?
     private var pauseOffset: TimeInterval = 0
+    private var lastMetronomeBeat: Int = -1
+    private var countInBeatsRemaining: Int = 0
 
     /// Callback when playback position updates (fires per measure).
     public var onMeasureChanged: ((Int) -> Void)?
@@ -88,14 +91,41 @@ public final class PlaybackEngine {
         engine.attach(metronome)
         engine.connect(metronome, to: engine.mainMixerNode, format: nil)
 
-        // Load default soundfont if available
-        if let soundfontURL = Bundle.main.url(forResource: "GeneralUser", withExtension: "sf2") {
-            try? sampler.loadSoundBankInstrument(
-                at: soundfontURL,
-                program: 0,
-                bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
-                bankLSB: UInt8(kAUSampler_DefaultBankLSB)
-            )
+        // Load soundfont: try bundled .sf2 first, then fall back to system DLS
+        var loaded = false
+        for name in ["GeneralUser", "FluidR3_GM", "soundfont"] {
+            for ext in ["sf2", "dls"] {
+                if let url = Bundle.main.url(forResource: name, withExtension: ext) {
+                    do {
+                        try sampler.loadSoundBankInstrument(
+                            at: url,
+                            program: 0,
+                            bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
+                            bankLSB: UInt8(kAUSampler_DefaultBankLSB)
+                        )
+                        loaded = true
+                    } catch {}
+                }
+                if loaded { break }
+            }
+            if loaded { break }
+        }
+
+        // Fall back to system DLS (built into macOS/iOS)
+        if !loaded {
+            #if os(macOS)
+            let dlsPath = "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls"
+            let dlsURL = URL(fileURLWithPath: dlsPath)
+            if FileManager.default.fileExists(atPath: dlsPath) {
+                try? sampler.loadSoundBankInstrument(
+                    at: dlsURL,
+                    program: 0,
+                    bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
+                    bankLSB: UInt8(kAUSampler_DefaultBankLSB)
+                )
+            }
+            #endif
+            // AVAudioUnitSampler produces a default piano sound even without explicit loading
         }
 
         self.audioEngine = engine
