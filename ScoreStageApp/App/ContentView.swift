@@ -65,6 +65,9 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var openedScore: Score?
     @State private var openedFileURL: URL?
+    @State private var openedMusicXMLURL: URL?
+    @State private var openedSetlistItems: [SetListItem]?
+    @State private var openedSetlistIndex: Int?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private let importService = ScoreImportService()
@@ -72,7 +75,15 @@ struct ContentView: View {
     var body: some View {
         if let score = openedScore, let url = openedFileURL {
             // Full-window reader — takes over entire window like a music book
-            ScoreReaderView(score: score, fileURL: url, onClose: closeScore)
+            ScoreReaderView(
+                        score: score,
+                        fileURL: url,
+                        musicXMLURL: openedMusicXMLURL,
+                        onClose: closeScore,
+                        setlistItems: openedSetlistItems,
+                        currentSetlistIndex: openedSetlistIndex,
+                        onNavigateSetlist: navigateSetlistItem
+                    )
                 .transition(.move(edge: .trailing))
         } else {
             #if os(iOS)
@@ -183,7 +194,9 @@ struct ContentView: View {
             NavigationStack {
                 SetlistListView()
                     .navigationDestination(for: SetList.self) { setlist in
-                        SetlistDetailView(setlist: setlist)
+                        SetlistDetailView(setlist: setlist) { score, items, index in
+                            openSetlistScore(score, items: items, index: index)
+                        }
                     }
             }
             .tabItem { Label("Setlists", systemImage: "list.bullet.rectangle") }
@@ -215,7 +228,9 @@ struct ContentView: View {
         case .setlists:
             SetlistListView()
                 .navigationDestination(for: SetList.self) { setlist in
-                    SetlistDetailView(setlist: setlist)
+                    SetlistDetailView(setlist: setlist) { score, items, index in
+                        openSetlistScore(score, items: items, index: index)
+                    }
                 }
         case .settings:
             SettingsView()
@@ -225,12 +240,27 @@ struct ContentView: View {
     // MARK: - Open / Close Score
 
     private func openScore(_ score: Score) {
-        guard let primaryAsset = score.assets.first(where: { $0.isPrimary }) ?? score.assets.first else { return }
+        // Find the primary display asset (PDF preferred, or whatever is primary)
+        let displayAsset = score.assets.first(where: { $0.isPrimary }) ?? score.assets.first(where: { $0.type == .pdf }) ?? score.assets.first
+        guard let asset = displayAsset else { return }
+
         do {
-            let url = try importService.fileURL(for: primaryAsset)
+            let url = try importService.fileURL(for: asset)
             score.lastOpenedAt = Date()
+
+            // Also look for a MusicXML asset for playback
+            var xmlURL: URL? = nil
+            if let xmlAsset = score.assets.first(where: { $0.type == .musicXML }) {
+                xmlURL = try? importService.fileURL(for: xmlAsset)
+            }
+            // If the primary file itself is MusicXML, use it for both display and playback
+            if asset.type == .musicXML {
+                xmlURL = url
+            }
+
             withAnimation(.easeInOut(duration: 0.2)) {
                 openedFileURL = url
+                openedMusicXMLURL = xmlURL
                 openedScore = score
             }
         } catch {
@@ -238,10 +268,27 @@ struct ContentView: View {
         }
     }
 
+    private func openSetlistScore(_ score: Score, items: [SetListItem], index: Int) {
+        openedSetlistItems = items
+        openedSetlistIndex = index
+        openScore(score)
+    }
+
+    private func navigateSetlistItem(_ index: Int) {
+        guard let items = openedSetlistItems,
+              index >= 0 && index < items.count,
+              let score = items[index].score else { return }
+        openedSetlistIndex = index
+        openScore(score)
+    }
+
     private func closeScore() {
         withAnimation(.easeInOut(duration: 0.2)) {
             openedScore = nil
             openedFileURL = nil
+            openedMusicXMLURL = nil
+            openedSetlistItems = nil
+            openedSetlistIndex = nil
         }
     }
 }

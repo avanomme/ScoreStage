@@ -31,7 +31,7 @@ extension View {
     ) -> some View {
         modifier(FileImportModifier(
             isPresented: isPresented,
-            allowedTypes: [.pdf, .xml, .midi, .png, .jpeg, .tiff],
+            allowedTypes: [.pdf, .xml, .midi, .png, .jpeg, .tiff, .data],
             allowMultiple: allowMultiple,
             onImport: onImport
         ))

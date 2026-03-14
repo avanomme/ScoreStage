@@ -8,9 +8,11 @@ public struct SetlistDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingAddScores = false
     @Query private var allScores: [Score]
+    private let onOpenScore: ((Score, [SetListItem], Int) -> Void)?
 
-    public init(setlist: SetList) {
+    public init(setlist: SetList, onOpenScore: ((Score, [SetListItem], Int) -> Void)? = nil) {
         self.setlist = setlist
+        self.onOpenScore = onOpenScore
     }
 
     private var sortedItems: [SetListItem] {
@@ -33,8 +35,14 @@ public struct SetlistDetailView: View {
                         .foregroundStyle(.secondary)
                         .font(ASTypography.body)
                 } else {
-                    ForEach(sortedItems) { item in
-                        SetlistItemRow(item: item)
+                    ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
+                        SetlistItemRow(item: item, index: index + 1)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if let score = item.score {
+                                    onOpenScore?(score, sortedItems, index)
+                                }
+                            }
                     }
                     .onDelete { indexSet in
                         let items = sortedItems
@@ -77,23 +85,46 @@ public struct SetlistDetailView: View {
 
 struct SetlistItemRow: View {
     let item: SetListItem
+    let index: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ASSpacing.xxs) {
-            Text(item.score?.title ?? "Unknown Score")
-                .font(ASTypography.body)
+        HStack(spacing: ASSpacing.md) {
+            // Track number
+            Text("\(index)")
+                .font(ASTypography.monoSmall)
+                .foregroundStyle(.tertiary)
+                .frame(width: 24)
 
-            if !item.performanceNotes.isEmpty {
-                Text(item.performanceNotes)
-                    .font(ASTypography.caption)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: ASSpacing.xxs) {
+                Text(item.score?.title ?? "Unknown Score")
+                    .font(ASTypography.body)
+
+                HStack(spacing: ASSpacing.sm) {
+                    if let composer = item.score?.composer, !composer.isEmpty {
+                        Text(composer)
+                            .font(ASTypography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if !item.performanceNotes.isEmpty {
+                        Text(item.performanceNotes)
+                            .font(ASTypography.captionSmall)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                if item.pauseDuration > 0 {
+                    Label("\(Int(item.pauseDuration))s pause", systemImage: "timer")
+                        .font(ASTypography.captionSmall)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
-            if item.pauseDuration > 0 {
-                Label("\(Int(item.pauseDuration))s pause", systemImage: "timer")
-                    .font(ASTypography.captionSmall)
-                    .foregroundStyle(.tertiary)
-            }
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, ASSpacing.xxs)
     }

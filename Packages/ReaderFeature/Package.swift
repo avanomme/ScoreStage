@@ -11,9 +11,11 @@ let package = Package(
         .package(path: "../CoreDomain"),
         .package(path: "../DesignSystem"),
         .package(path: "../AnnotationFeature"),
+        .package(path: "../PlaybackFeature"),
+        .package(path: "../NotationFeature"),
     ],
     targets: [
-        .target(name: "ReaderFeature", dependencies: ["CoreDomain", "DesignSystem", "AnnotationFeature"]),
+        .target(name: "ReaderFeature", dependencies: ["CoreDomain", "DesignSystem", "AnnotationFeature", "PlaybackFeature", "NotationFeature"]),
         .testTarget(name: "ReaderFeatureTests", dependencies: ["ReaderFeature"]),
     ]
 )

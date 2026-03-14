@@ -68,6 +68,18 @@ public final class AnnotationState {
     public var opacity: Double = 1.0
     public var canUndo = false
     public var canRedo = false
+    /// Whether strokes have changed since last save.
+    public var isDirty = false
+
+    // MARK: - Stroke Storage (centralized across pages)
+
+    public var allStrokes: [CanvasStroke] = []
+    private var undoneStrokes: [CanvasStroke] = []
+
+    /// Callback fired when annotations should be saved (on Done / exit).
+    public var onSave: (() -> Void)?
+    /// Callback fired when clear page is tapped — caller provides current page index.
+    public var onClearPage: (() -> Void)?
 
     // MARK: - Layer Management
 
@@ -102,6 +114,57 @@ public final class AnnotationState {
     public init() {
         // Set active layer to the default layer
         activeLayerID = layers.first?.id
+    }
+
+    // MARK: - Stroke Operations
+
+    public func addStroke(_ stroke: CanvasStroke) {
+        allStrokes.append(stroke)
+        undoneStrokes.removeAll()
+        isDirty = true
+        canUndo = true
+        canRedo = false
+    }
+
+    public func undo() {
+        guard let last = allStrokes.popLast() else { return }
+        undoneStrokes.append(last)
+        isDirty = true
+        canUndo = !allStrokes.isEmpty
+        canRedo = true
+    }
+
+    public func redo() {
+        guard let last = undoneStrokes.popLast() else { return }
+        allStrokes.append(last)
+        isDirty = true
+        canUndo = true
+        canRedo = !undoneStrokes.isEmpty
+    }
+
+    /// Remove all strokes on the given page.
+    public func clearPage(_ pageIndex: Int) {
+        allStrokes.removeAll { $0.pageIndex == pageIndex }
+        isDirty = true
+        canUndo = !allStrokes.isEmpty
+    }
+
+    /// Remove all strokes on all pages.
+    public func clearAll() {
+        allStrokes.removeAll()
+        undoneStrokes.removeAll()
+        isDirty = true
+        canUndo = false
+        canRedo = false
+    }
+
+    /// Save and exit annotation mode.
+    public func saveAndExit() {
+        if isDirty {
+            onSave?()
+            isDirty = false
+        }
+        isAnnotating = false
     }
 
     // MARK: - Tool Selection
@@ -241,14 +304,14 @@ public struct AnnotationToolbarView: View {
                 divider
 
                 // Undo / Redo
-                Button { /* undo */ } label: {
+                Button { state.undo() } label: {
                     Image(systemName: "arrow.uturn.backward")
                         .font(.system(size: 14, weight: .medium))
                 }
                 .disabled(!state.canUndo)
                 .buttonStyle(.plain)
 
-                Button { /* redo */ } label: {
+                Button { state.redo() } label: {
                     Image(systemName: "arrow.uturn.forward")
                         .font(.system(size: 14, weight: .medium))
                 }
@@ -276,10 +339,23 @@ public struct AnnotationToolbarView: View {
 
                 divider
 
-                // Done — exit annotation environment
+                // Clear page
+                Button {
+                    state.onClearPage?()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear Page Annotations")
+
+                divider
+
+                // Done — save and exit annotation environment
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        state.isAnnotating = false
+                        state.saveAndExit()
                     }
                 } label: {
                     Text("Done")

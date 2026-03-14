@@ -61,9 +61,25 @@ public final class PlaybackEngine {
 
     // MARK: - Setup
 
+    /// Number of parts in the loaded score.
+    public var partCount: Int { score?.parts.count ?? 0 }
+
+    /// Part names for UI display.
+    public var partNames: [String] { score?.parts.map { $0.name } ?? [] }
+
+    /// Total number of measures.
+    public var measureCount: Int { measureMap?.entries.count ?? 0 }
+
+    /// Total duration of the score.
+    public var totalDuration: TimeInterval { measureMap?.totalDuration ?? 0 }
+
+    /// Whether a score is loaded and ready for playback.
+    public var isReady: Bool { !events.isEmpty && audioEngine != nil }
+
     /// Prepare the engine with a parsed score.
     public func prepare(score: NormalizedScore, measureMap: MeasureMap) {
         self.measureMap = measureMap
+        self.score = score
         self.tempo = measureMap.entries.first?.tempo ?? 120.0
 
         // Initialize part volumes
@@ -149,14 +165,47 @@ public final class PlaybackEngine {
         if state == .paused {
             // Resume from pause position
             startTimestamp = Date().addingTimeInterval(-pauseOffset)
+            state = .playing
+            startPlaybackLoop()
         } else {
             // Start from beginning or current position
-            startTimestamp = Date().addingTimeInterval(-currentTime)
-            eventIndex = findEventIndex(at: currentTime)
-        }
+            lastMetronomeBeat = -1
 
-        state = .playing
-        startPlaybackLoop()
+            if isCountInEnabled {
+                // Count-in: play time-signature beats worth of clicks before starting
+                let beatsPerBar = measureMap?.entries.first?.timeSignature.beats ?? 4
+                countInBeatsRemaining = beatsPerBar
+                state = .playing
+                startCountIn(beats: beatsPerBar)
+            } else {
+                startTimestamp = Date().addingTimeInterval(-currentTime)
+                eventIndex = findEventIndex(at: currentTime)
+                state = .playing
+                startPlaybackLoop()
+            }
+        }
+    }
+
+    /// Play count-in clicks, then start the main playback loop.
+    private func startCountIn(beats: Int) {
+        playbackTask?.cancel()
+        playbackTask = Task { [weak self] in
+            guard let self else { return }
+            let beatDuration = 60.0 / self.tempo
+
+            for beat in 0..<beats {
+                guard !Task.isCancelled && self.state == .playing else { return }
+                self.countInBeatsRemaining = beats - beat
+                self.playMetronomeClick(isDownbeat: beat == 0)
+                try? await Task.sleep(for: .milliseconds(Int(beatDuration * 1000)))
+            }
+            self.countInBeatsRemaining = 0
+
+            guard !Task.isCancelled && self.state == .playing else { return }
+            self.startTimestamp = Date().addingTimeInterval(-self.currentTime)
+            self.eventIndex = self.findEventIndex(at: self.currentTime)
+            self.startPlaybackLoop()
+        }
     }
 
     public func pause() {
@@ -265,11 +314,24 @@ public final class PlaybackEngine {
                     }
                 }
 
-                // Update measure
+                // Update measure and fire metronome
                 if let entry = self.measureMap?.entry(at: elapsed) {
                     if entry.measureNumber != self.currentMeasure {
                         self.currentMeasure = entry.measureNumber
                         self.onMeasureChanged?(entry.measureNumber)
+                    }
+
+                    // Metronome: calculate current beat within measure
+                    if self.isMetronomeEnabled {
+                        let beatsPerBar = entry.timeSignature.beats
+                        let beatDuration = 60.0 / entry.tempo
+                        let timeInMeasure = elapsed - entry.startTime
+                        let currentBeat = Int(timeInMeasure / beatDuration)
+                        let globalBeat = entry.measureNumber * 1000 + currentBeat
+                        if globalBeat != self.lastMetronomeBeat && currentBeat < beatsPerBar {
+                            self.lastMetronomeBeat = globalBeat
+                            self.playMetronomeClick(isDownbeat: currentBeat == 0)
+                        }
                     }
                 }
 

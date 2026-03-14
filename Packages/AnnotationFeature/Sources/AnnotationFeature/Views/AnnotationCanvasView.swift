@@ -2,13 +2,32 @@ import SwiftUI
 import CoreDomain
 
 /// Stored stroke with its layer association and visual properties.
-public struct CanvasStroke: Identifiable {
-    public let id = UUID()
+public struct CanvasStroke: Identifiable, Sendable {
+    public let id: UUID
     public var points: [CGPoint]
     public var layerID: UUID
     public var color: Color
     public var lineWidth: CGFloat
     public var opacity: Double
+    public var pageIndex: Int
+
+    public init(
+        id: UUID = UUID(),
+        points: [CGPoint],
+        layerID: UUID,
+        color: Color,
+        lineWidth: CGFloat,
+        opacity: Double,
+        pageIndex: Int = 0
+    ) {
+        self.id = id
+        self.points = points
+        self.layerID = layerID
+        self.color = color
+        self.lineWidth = lineWidth
+        self.opacity = opacity
+        self.pageIndex = pageIndex
+    }
 }
 
 /// A canvas overlay for drawing annotations on top of a PDF page.
@@ -18,8 +37,6 @@ public struct AnnotationCanvasView: View {
     let pageSize: CGSize
     @Bindable var state: AnnotationState
     @State private var currentPath: [CGPoint] = []
-    @State private var completedStrokes: [CanvasStroke] = []
-    @State private var undoneStrokes: [CanvasStroke] = []
 
     public init(pageIndex: Int, pageSize: CGSize, state: AnnotationState) {
         self.pageIndex = pageIndex
@@ -27,11 +44,16 @@ public struct AnnotationCanvasView: View {
         self.state = state
     }
 
+    /// Strokes for the current page only.
+    private var pageStrokes: [CanvasStroke] {
+        state.allStrokes.filter { $0.pageIndex == pageIndex }
+    }
+
     public var body: some View {
         Canvas { context, _ in
             let visibleIDs = state.visibleLayerIDs
-            // Draw completed strokes for visible layers
-            for stroke in completedStrokes where visibleIDs.contains(stroke.layerID) {
+            // Draw completed strokes for this page and visible layers
+            for stroke in pageStrokes where visibleIDs.contains(stroke.layerID) {
                 drawStroke(stroke, in: &context)
             }
             // Draw current stroke (always visible while drawing)
@@ -41,17 +63,14 @@ public struct AnnotationCanvasView: View {
                     layerID: state.activeLayerID ?? UUID(),
                     color: state.selectedColor,
                     lineWidth: state.lineWidth,
-                    opacity: state.opacity
+                    opacity: state.opacity,
+                    pageIndex: pageIndex
                 )
                 drawStroke(activeStroke, in: &context)
             }
         }
         .gesture(drawingGesture)
         .allowsHitTesting(state.isAnnotating && state.selectedTool != .text)
-        .onChange(of: completedStrokes.count) {
-            state.canUndo = !completedStrokes.isEmpty
-            state.canRedo = !undoneStrokes.isEmpty
-        }
     }
 
     private var drawingGesture: some Gesture {
@@ -66,10 +85,10 @@ public struct AnnotationCanvasView: View {
                         layerID: activeID,
                         color: state.selectedColor,
                         lineWidth: state.lineWidth,
-                        opacity: state.opacity
+                        opacity: state.opacity,
+                        pageIndex: pageIndex
                     )
-                    completedStrokes.append(stroke)
-                    undoneStrokes.removeAll()
+                    state.addStroke(stroke)
                     currentPath = []
                 }
             }
@@ -94,15 +113,5 @@ public struct AnnotationCanvasView: View {
             )
         )
         context.opacity = 1.0
-    }
-
-    public func undo() {
-        guard let last = completedStrokes.popLast() else { return }
-        undoneStrokes.append(last)
-    }
-
-    public func redo() {
-        guard let last = undoneStrokes.popLast() else { return }
-        completedStrokes.append(last)
     }
 }
