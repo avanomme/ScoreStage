@@ -114,11 +114,22 @@ public final class ScoreImportService: Sendable {
         var composer = ""
         var pageCount = 0
 
-        // Try to parse "Composer - Title" or "Title - Composer" patterns
+        // Try to parse "Composer - Title" patterns, but only if the left side
+        // looks like a name (not a track number like "01", "22", etc.)
         let parts = fileName.components(separatedBy: " - ")
         if parts.count == 2 {
-            title = cleanTitle(parts[1])
-            composer = cleanTitle(parts[0])
+            let left = cleanTitle(parts[0])
+            let right = cleanTitle(parts[1])
+            let leftIsNumber = left.allSatisfy { $0.isNumber || $0 == "." || $0 == " " }
+
+            if leftIsNumber {
+                // "01 - Song Name" → keep full filename as title (preserving track number)
+                title = cleanTitle(fileName)
+            } else {
+                // "Composer - Title" → split normally
+                composer = left
+                title = right
+            }
         }
 
         // Extract page count from PDF

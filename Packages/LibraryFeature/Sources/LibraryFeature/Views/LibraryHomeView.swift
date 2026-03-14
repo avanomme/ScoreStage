@@ -47,6 +47,9 @@ public final class LibraryViewModel {
     public var inspectedScore: Score?
     /// Set when user wants to open a score (double-tap / context menu).
     public var scoreToOpen: Score?
+    /// Multi-select mode
+    public var isSelecting = false
+    public var selectedScoreIDs: Set<UUID> = []
 
     public init() {}
 
@@ -111,24 +114,32 @@ public struct LibraryHomeView: View {
     public var body: some View {
         let sorted = viewModel.sortedScores(scores, filter: filter)
 
-        Group {
-            if scores.isEmpty && filter == .all {
-                EmptyStateView(
-                    icon: "music.note.list",
-                    title: "No Scores Yet",
-                    message: "Import your sheet music to get started.",
-                    actionTitle: "Import Score"
-                ) {
-                    viewModel.showingImporter = true
+        VStack(spacing: 0) {
+            Group {
+                if scores.isEmpty && filter == .all {
+                    EmptyStateView(
+                        icon: "music.note.list",
+                        title: "No Scores Yet",
+                        message: "Import your sheet music to get started.",
+                        actionTitle: "Import Score"
+                    ) {
+                        viewModel.showingImporter = true
+                    }
+                } else if sorted.isEmpty {
+                    EmptyStateView(
+                        icon: emptyIcon,
+                        title: emptyTitle,
+                        message: emptyMessage
+                    )
+                } else {
+                    scoreGrid(sorted)
                 }
-            } else if sorted.isEmpty {
-                EmptyStateView(
-                    icon: emptyIcon,
-                    title: emptyTitle,
-                    message: emptyMessage
-                )
-            } else {
-                scoreGrid(sorted)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Selection action bar
+            if viewModel.isSelecting && !viewModel.selectedScoreIDs.isEmpty {
+                selectionActionBar(sorted)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -200,16 +211,40 @@ public struct LibraryHomeView: View {
         ScrollView {
             LazyVGrid(columns: gridColumns, spacing: ASSpacing.cardGap) {
                 ForEach(sorted) { score in
-                    ScoreCoverCard(score: score, isSelected: viewModel.inspectedScore?.id == score.id)
-                        .onTapGesture(count: 2) {
+                    ZStack(alignment: .topLeading) {
+                        ScoreCoverCard(
+                            score: score,
+                            isSelected: viewModel.isSelecting
+                                ? viewModel.selectedScoreIDs.contains(score.id)
+                                : viewModel.inspectedScore?.id == score.id
+                        )
+
+                        // Selection checkmark overlay
+                        if viewModel.isSelecting {
+                            Image(systemName: viewModel.selectedScoreIDs.contains(score.id)
+                                  ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(viewModel.selectedScoreIDs.contains(score.id)
+                                                 ? ASColors.accentFallback : .white.opacity(0.7))
+                                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                                .padding(8)
+                        }
+                    }
+                    .onTapGesture(count: 2) {
+                        if !viewModel.isSelecting {
                             viewModel.scoreToOpen = score
                         }
-                        .onTapGesture {
+                    }
+                    .onTapGesture {
+                        if viewModel.isSelecting {
+                            toggleScoreSelection(score.id)
+                        } else {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 viewModel.inspectedScore = score
                             }
                         }
-                        .contextMenu { scoreContextMenu(for: score) }
+                    }
+                    .contextMenu { scoreContextMenu(for: score) }
                 }
             }
             .padding(ASSpacing.screenPadding)
@@ -220,26 +255,115 @@ public struct LibraryHomeView: View {
 
     private func scoreListView(_ sorted: [Score]) -> some View {
         List(sorted) { score in
-            ScoreListRow(score: score, isSelected: viewModel.inspectedScore?.id == score.id)
-                .listRowInsets(EdgeInsets(top: 4, leading: ASSpacing.md, bottom: 4, trailing: ASSpacing.md))
-                .listRowSeparator(.hidden)
-                .listRowBackground(
-                    RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
-                        .fill(viewModel.inspectedScore?.id == score.id ? ASColors.chromeSurfaceSelected : Color.clear)
-                        .padding(.horizontal, ASSpacing.xs)
-                )
-                .onTapGesture(count: 2) {
+            HStack(spacing: ASSpacing.md) {
+                if viewModel.isSelecting {
+                    Image(systemName: viewModel.selectedScoreIDs.contains(score.id)
+                          ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(viewModel.selectedScoreIDs.contains(score.id)
+                                         ? ASColors.accentFallback : Color.gray.opacity(0.4))
+                }
+
+                ScoreListRow(score: score, isSelected: !viewModel.isSelecting && viewModel.inspectedScore?.id == score.id)
+            }
+            .listRowInsets(EdgeInsets(top: 4, leading: ASSpacing.md, bottom: 4, trailing: ASSpacing.md))
+            .listRowSeparator(.hidden)
+            .listRowBackground(
+                RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                    .fill(
+                        viewModel.isSelecting
+                            ? (viewModel.selectedScoreIDs.contains(score.id) ? ASColors.accentFallback.opacity(0.06) : Color.clear)
+                            : (viewModel.inspectedScore?.id == score.id ? ASColors.chromeSurfaceSelected : Color.clear)
+                    )
+                    .padding(.horizontal, ASSpacing.xs)
+            )
+            .onTapGesture(count: 2) {
+                if !viewModel.isSelecting {
                     viewModel.scoreToOpen = score
                 }
-                .onTapGesture {
+            }
+            .onTapGesture {
+                if viewModel.isSelecting {
+                    toggleScoreSelection(score.id)
+                } else {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewModel.inspectedScore = score
                     }
                 }
-                .contextMenu { scoreContextMenu(for: score) }
+            }
+            .contextMenu { scoreContextMenu(for: score) }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+    }
+
+    private func toggleScoreSelection(_ id: UUID) {
+        if viewModel.selectedScoreIDs.contains(id) {
+            viewModel.selectedScoreIDs.remove(id)
+        } else {
+            viewModel.selectedScoreIDs.insert(id)
+        }
+    }
+
+    // MARK: - Selection Action Bar
+
+    private func selectionActionBar(_ sorted: [Score]) -> some View {
+        HStack(spacing: ASSpacing.lg) {
+            // Select All / Deselect All
+            Button {
+                if viewModel.selectedScoreIDs.count == sorted.count {
+                    viewModel.selectedScoreIDs.removeAll()
+                } else {
+                    viewModel.selectedScoreIDs = Set(sorted.map(\.id))
+                }
+            } label: {
+                Text(viewModel.selectedScoreIDs.count == sorted.count ? "Deselect All" : "Select All")
+                    .font(ASTypography.labelSmall)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(ASColors.accentFallback)
+
+            Spacer()
+
+            Text("\(viewModel.selectedScoreIDs.count) selected")
+                .font(ASTypography.label)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            // Favorite selected
+            Button {
+                for score in sorted where viewModel.selectedScoreIDs.contains(score.id) {
+                    score.isFavorite = true
+                }
+            } label: {
+                Image(systemName: "heart")
+                    .font(.system(size: 16))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            // Delete selected
+            Button(role: .destructive) {
+                for score in sorted where viewModel.selectedScoreIDs.contains(score.id) {
+                    modelContext.delete(score)
+                }
+                viewModel.selectedScoreIDs.removeAll()
+                viewModel.isSelecting = false
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                    Text("Delete")
+                        .font(ASTypography.labelSmall)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.red)
+        }
+        .padding(.horizontal, ASSpacing.lg)
+        .padding(.vertical, ASSpacing.md)
+        .background(.regularMaterial)
     }
 
     private var gridColumns: [GridItem] {
@@ -270,6 +394,19 @@ public struct LibraryHomeView: View {
                 #endif
             } label: {
                 Label("Add", systemImage: "plus")
+            }
+        }
+        ToolbarItem {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.isSelecting.toggle()
+                    if !viewModel.isSelecting {
+                        viewModel.selectedScoreIDs.removeAll()
+                    }
+                }
+            } label: {
+                Text(viewModel.isSelecting ? "Done" : "Select")
+                    .font(ASTypography.labelSmall)
             }
         }
         ToolbarItem {
