@@ -226,12 +226,14 @@ struct ContentView: View {
         case .genres:
             CollectionsBrowserView(mode: .genres)
         case .setlists:
-            SetlistListView()
-                .navigationDestination(for: SetList.self) { setlist in
-                    SetlistDetailView(setlist: setlist) { score, items, index in
-                        openSetlistScore(score, items: items, index: index)
+            NavigationStack {
+                SetlistListView()
+                    .navigationDestination(for: SetList.self) { setlist in
+                        SetlistDetailView(setlist: setlist) { score, items, index in
+                            openSetlistScore(score, items: items, index: index)
+                        }
                     }
-                }
+            }
         case .settings:
             SettingsView()
         }

@@ -82,9 +82,25 @@ struct ScoreScannerView: View {
                     .font(ASTypography.label)
                     .foregroundStyle(.secondary)
 
-                // Enhancement filter picker
+                // Edit tools row
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: ASSpacing.sm) {
+                    HStack(spacing: ASSpacing.md) {
+                        // Auto-fix (deskew + enhance)
+                        editToolButton(icon: "wand.and.stars", label: "Auto") {
+                            autoFixCurrentPage()
+                        }
+                        // Deskew
+                        editToolButton(icon: "skew", label: "Deskew") {
+                            deskewCurrentPage()
+                        }
+                        // Rotate
+                        editToolButton(icon: "rotate.right", label: "Rotate") {
+                            rotateCurrentPage()
+                        }
+
+                        Divider().frame(height: 36)
+
+                        // Enhancement filter picker
                         ForEach(ScoreScannerService.EnhancementFilter.allCases) { filter in
                             filterButton(filter)
                         }
@@ -200,6 +216,64 @@ struct ScoreScannerView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Edit Tool Button
+
+    private func editToolButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: ASSpacing.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 36, height: 36)
+                    .background(ASColors.chromeSurfaceElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
+                Text(label)
+                    .font(ASTypography.captionSmall)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Edit Actions
+
+    private func autoFixCurrentPage() {
+        guard scannedPages.indices.contains(selectedPageIndex) else { return }
+        let source = scannedPages[selectedPageIndex].original
+        // Auto-deskew then apply current filter
+        let deskewed = scannerService.autoDeskew(source)
+        scannedPages[selectedPageIndex].original = deskewed
+        scannedPages[selectedPageIndex].enhanced = scannerService.enhance(deskewed, filter: activeFilter)
+    }
+
+    private func deskewCurrentPage() {
+        guard scannedPages.indices.contains(selectedPageIndex) else { return }
+        let source = scannedPages[selectedPageIndex].original
+        let deskewed = scannerService.autoDeskew(source)
+        scannedPages[selectedPageIndex].original = deskewed
+        scannedPages[selectedPageIndex].enhanced = scannerService.enhance(deskewed, filter: activeFilter)
+    }
+
+    private func rotateCurrentPage() {
+        guard scannedPages.indices.contains(selectedPageIndex) else { return }
+        let source = scannedPages[selectedPageIndex].enhanced ?? scannedPages[selectedPageIndex].original
+        let rotated = rotateImage90(source)
+        scannedPages[selectedPageIndex].original = rotated
+        scannedPages[selectedPageIndex].enhanced = rotated
+    }
+
+    private func rotateImage90(_ image: UIImage) -> UIImage {
+        let newOrientation: UIImage.Orientation
+        switch image.imageOrientation {
+        case .up: newOrientation = .right
+        case .right: newOrientation = .down
+        case .down: newOrientation = .left
+        case .left: newOrientation = .up
+        default: newOrientation = .right
+        }
+        return UIImage(cgImage: image.cgImage!, scale: image.scale, orientation: newOrientation)
+    }
+
     // MARK: - Actions
 
     private func applyFilterToAll(_ filter: ScoreScannerService.EnhancementFilter) {
@@ -252,7 +326,7 @@ struct ScoreScannerView: View {
 
 struct ScannedPage: Identifiable {
     var id: Int
-    let original: UIImage
+    var original: UIImage
     var enhanced: UIImage?
 }
 

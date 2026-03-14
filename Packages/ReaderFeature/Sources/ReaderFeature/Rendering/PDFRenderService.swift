@@ -65,16 +65,14 @@ public final class PDFRenderService: @unchecked Sendable {
                     return
                 }
 
+                // White background
                 ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
                 ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+                // CGPDFPage draws in Quartz coordinates (origin bottom-left).
+                // CGContext bitmap also uses origin bottom-left.
+                // Just scale to render at higher resolution — no flip needed.
                 ctx.scaleBy(x: scale, y: scale)
-
-                #if canImport(UIKit)
-                // PDFPage.draw applies a flip; we need to match coordinate systems
-                ctx.translateBy(x: 0, y: bounds.height)
-                ctx.scaleBy(x: 1, y: -1)
-                #endif
-
                 page.draw(with: .mediaBox, to: ctx)
 
                 let image = ctx.makeImage()

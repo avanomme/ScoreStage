@@ -170,6 +170,86 @@ public final class ScoreScannerService {
         return CGSize(width: size.width * scale, height: size.height * scale)
     }
 
+    // MARK: - Deskew & Perspective Correction
+
+    /// Auto-detect document edges and apply perspective correction.
+    public func autoDeskew(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        // Use CIDetector for rectangle detection
+        let detector = CIDetector(ofType: CIDetectorTypeRectangle, context: ciContext, options: [
+            CIDetectorAccuracy: CIDetectorAccuracyHigh,
+            CIDetectorAspectRatio: 1.41 // A4/Letter aspect ratio hint
+        ])
+
+        guard let features = detector?.features(in: ciImage),
+              let rect = features.first as? CIRectangleFeature else {
+            // No rectangle detected — try just straightening
+            return autoStraighten(image)
+        }
+
+        // Apply perspective correction
+        let corrected = ciImage.applyingFilter("CIPerspectiveCorrection", parameters: [
+            "inputTopLeft": CIVector(cgPoint: rect.topLeft),
+            "inputTopRight": CIVector(cgPoint: rect.topRight),
+            "inputBottomLeft": CIVector(cgPoint: rect.bottomLeft),
+            "inputBottomRight": CIVector(cgPoint: rect.bottomRight)
+        ])
+
+        guard let cgImage = ciContext.createCGImage(corrected, from: corrected.extent) else {
+            return image
+        }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    /// Auto-straighten a slightly rotated image.
+    public func autoStraighten(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+        let straightened = ciImage.applyingFilter("CIStraightenFilter", parameters: [
+            "inputAngle": 0 // Auto-detect angle
+        ])
+        guard let cgImage = ciContext.createCGImage(straightened, from: straightened.extent) else {
+            return image
+        }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    /// Crop an image to the given normalized rect (0-1 range).
+    public func crop(_ image: UIImage, to normalizedRect: CGRect) -> UIImage {
+        let size = image.size
+        let cropRect = CGRect(
+            x: normalizedRect.origin.x * size.width,
+            y: normalizedRect.origin.y * size.height,
+            width: normalizedRect.width * size.width,
+            height: normalizedRect.height * size.height
+        )
+        guard let cgImage = image.cgImage?.cropping(to: cropRect) else { return image }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    /// Apply perspective correction with manual corner points (normalized 0-1 coordinates).
+    public func perspectiveCorrect(_ image: UIImage, topLeft: CGPoint, topRight: CGPoint, bottomLeft: CGPoint, bottomRight: CGPoint) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+        let extent = ciImage.extent
+
+        // Convert normalized coords to image coords
+        func toImagePoint(_ p: CGPoint) -> CIVector {
+            CIVector(x: p.x * extent.width, y: (1 - p.y) * extent.height)
+        }
+
+        let corrected = ciImage.applyingFilter("CIPerspectiveCorrection", parameters: [
+            "inputTopLeft": toImagePoint(topLeft),
+            "inputTopRight": toImagePoint(topRight),
+            "inputBottomLeft": toImagePoint(bottomLeft),
+            "inputBottomRight": toImagePoint(bottomRight)
+        ])
+
+        guard let cgImage = ciContext.createCGImage(corrected, from: corrected.extent) else {
+            return image
+        }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
+
     // MARK: - Errors
 
     public enum ScanError: LocalizedError {
