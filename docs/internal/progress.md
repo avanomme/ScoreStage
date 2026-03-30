@@ -164,3 +164,23 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - Start Sprint 4 from the parity matrix
 - Focus on library scale, import robustness, metadata power tools, and scan cleanup quality
+
+---
+
+## 2026-03-30 — Sprint 4 Complete: Library / Import / Metadata
+
+**What changed:**
+- Rebuilt file import around a staged review flow with duplicate detection, merge/replace decisions, recursive folder ingestion, and batch import summaries instead of blind one-shot imports
+- Added smart collections for import triage, missing metadata, rehearsal-active material, performance-ready charts, and scan-heavy libraries
+- Added bulk metadata editing from multi-select so library cleanup can happen across many scores at once instead of file by file
+- Extended collection browsing to include smart collections as first-class library slices
+- Tightened the scan cleanup pipeline with white-point normalization, despeckling, and notation-focused contrast balancing before page export
+
+**Verification:**
+- `swift build` in `Packages/CoreDomain`
+- `swift build` in `Packages/LibraryFeature`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Start Sprint 5 from the parity matrix
+- Focus on real sync, backup, restore, export packages, and migration-safe recovery flows
