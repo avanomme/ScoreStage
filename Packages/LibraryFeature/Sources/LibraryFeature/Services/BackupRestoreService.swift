@@ -1,19 +1,9 @@
-// BackupRestoreService — Full library backup bundle export/import.
-
 import Foundation
 import SwiftData
 import CoreDomain
 
-/// Exports and imports the entire ScoreStage library as a portable backup bundle.
-/// The bundle is a directory containing:
-/// - metadata.json (scores, setlists, bookmarks, families)
-/// - ImportedScores/ (PDF files)
-/// - Annotations/ (annotation layer data)
 @MainActor
 public final class BackupRestoreService: ObservableObject {
-
-    // MARK: - State
-
     public enum BackupState: Sendable {
         case idle
         case exporting(progress: Double)
@@ -22,9 +12,27 @@ public final class BackupRestoreService: ObservableObject {
         case error(String)
     }
 
+    public enum RestoreStrategy: String, CaseIterable, Identifiable, Sendable {
+        case merge
+        case replaceExisting
+        case keepBoth
+
+        public var id: String { rawValue }
+
+        public var label: String {
+            switch self {
+            case .merge: "Merge"
+            case .replaceExisting: "Replace Existing"
+            case .keepBoth: "Keep Both"
+            }
+        }
+    }
+
     @Published public private(set) var state: BackupState = .idle
 
     private let modelContext: ModelContext
+    private let importedScoresDirectoryName = "ImportedScores"
+    private let restorePointsDirectoryName = "RestorePoints"
 
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -32,108 +40,102 @@ public final class BackupRestoreService: ObservableObject {
 
     // MARK: - Export
 
-    /// Export the full library to a backup bundle at the specified directory.
-    /// Returns the URL of the created .scorestagebackup file.
-    public func exportBackup(to directory: URL) async throws -> URL {
+    public func exportBackup(to directory: URL, packageName: String? = nil) async throws -> URL {
         state = .exporting(progress: 0)
 
-        // Create temp directory for bundle
-        let bundleName = "ScoreStage-Backup-\(formatDate(Date()))"
+        let bundleName = packageName ?? "ScoreStage-Backup-\(formatDate(Date()))"
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let bundleURL = directory.appendingPathComponent("\(bundleName).scorestagebackup")
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(bundleName)
 
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
-        // Export metadata
-        state = .exporting(progress: 0.1)
-        let metadata = try await gatherMetadata()
-        let metadataData = try JSONEncoder().encode(metadata)
-        try metadataData.write(to: tempDir.appendingPathComponent("metadata.json"))
+        let library = try await gatherLibrarySnapshot()
+        state = .exporting(progress: 0.25)
+        let manifest = BackupManifest(
+            version: 2,
+            createdAt: Date(),
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+            scoreCount: library.scores.count,
+            setlistCount: library.setlists.count,
+            bookmarkCount: library.scores.reduce(0) { $0 + $1.bookmarks.count }
+        )
 
-        // Copy score PDFs
-        state = .exporting(progress: 0.3)
-        let scoresDir = tempDir.appendingPathComponent("ImportedScores")
-        try FileManager.default.createDirectory(at: scoresDir, withIntermediateDirectories: true)
+        try JSONEncoder.prettyPrinted.encode(manifest).write(to: tempDir.appendingPathComponent("manifest.json"))
+        try JSONEncoder.prettyPrinted.encode(library).write(to: tempDir.appendingPathComponent("library.json"))
 
-        let appScoresDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("ImportedScores")
+        state = .exporting(progress: 0.45)
+        let packageScoresDir = tempDir.appendingPathComponent(importedScoresDirectoryName)
+        try FileManager.default.createDirectory(at: packageScoresDir, withIntermediateDirectories: true)
 
-        if let appScoresDir, FileManager.default.fileExists(atPath: appScoresDir.path) {
-            let files = try FileManager.default.contentsOfDirectory(at: appScoresDir, includingPropertiesForKeys: nil)
+        let sourceScoresDir = try importedScoresDirectory()
+        if FileManager.default.fileExists(atPath: sourceScoresDir.path) {
+            let files = try FileManager.default.contentsOfDirectory(at: sourceScoresDir, includingPropertiesForKeys: nil)
             for (index, file) in files.enumerated() {
-                try FileManager.default.copyItem(at: file, to: scoresDir.appendingPathComponent(file.lastPathComponent))
-                let progress = 0.3 + 0.5 * Double(index + 1) / Double(max(files.count, 1))
+                let destination = packageScoresDir.appendingPathComponent(file.lastPathComponent)
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.copyItem(at: file, to: destination)
+                let progress = 0.45 + (0.45 * Double(index + 1) / Double(max(files.count, 1)))
                 state = .exporting(progress: progress)
             }
         }
 
-        // Create ZIP archive
-        state = .exporting(progress: 0.85)
-
-        // Move temp directory to final location
+        state = .exporting(progress: 0.95)
         if FileManager.default.fileExists(atPath: bundleURL.path) {
             try FileManager.default.removeItem(at: bundleURL)
         }
         try FileManager.default.moveItem(at: tempDir, to: bundleURL)
-
         state = .completed(bundleURL)
         return bundleURL
     }
 
     // MARK: - Import
 
-    /// Import a backup bundle, merging with existing library.
-    public func importBackup(from bundleURL: URL) async throws {
+    public func importBackup(from bundleURL: URL, strategy: RestoreStrategy = .merge) async throws {
         state = .importing(progress: 0)
 
-        let metadataURL = bundleURL.appendingPathComponent("metadata.json")
-        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
-            state = .error("Invalid backup: metadata.json not found")
+        let manifestURL = bundleURL.appendingPathComponent("manifest.json")
+        let libraryURL = bundleURL.appendingPathComponent("library.json")
+        guard FileManager.default.fileExists(atPath: manifestURL.path),
+              FileManager.default.fileExists(atPath: libraryURL.path) else {
+            state = .error("Invalid backup package")
             throw BackupError.invalidBundle
         }
 
-        // Parse metadata
-        state = .importing(progress: 0.1)
-        let data = try Data(contentsOf: metadataURL)
-        let metadata = try JSONDecoder().decode(BackupMetadata.self, from: data)
+        _ = try await createRestorePoint()
 
-        // Import scores
-        state = .importing(progress: 0.2)
-        let scoresDir = bundleURL.appendingPathComponent("ImportedScores")
-        let appScoresDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("ImportedScores")
+        let libraryData = try Data(contentsOf: libraryURL)
+        let library = try JSONDecoder().decode(BackupLibrary.self, from: libraryData)
 
-        if let appScoresDir {
-            try FileManager.default.createDirectory(at: appScoresDir, withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: scoresDir.path) {
-                let files = try FileManager.default.contentsOfDirectory(at: scoresDir, includingPropertiesForKeys: nil)
-                for (index, file) in files.enumerated() {
-                    let dest = appScoresDir.appendingPathComponent(file.lastPathComponent)
-                    if !FileManager.default.fileExists(atPath: dest.path) {
-                        try FileManager.default.copyItem(at: file, to: dest)
-                    }
-                    let progress = 0.2 + 0.6 * Double(index + 1) / Double(max(files.count, 1))
-                    state = .importing(progress: progress)
-                }
-            }
-        }
+        state = .importing(progress: 0.15)
+        try restoreLibraryFiles(from: bundleURL)
 
-        // Restore metadata records
-        state = .importing(progress: 0.85)
-        try restoreMetadata(metadata)
+        state = .importing(progress: 0.45)
+        let scoreMap = try restoreScores(library.scores, strategy: strategy)
 
+        state = .importing(progress: 0.75)
+        try restoreSetlists(library.setlists, scoreMap: scoreMap, strategy: strategy)
+
+        try modelContext.save()
         state = .completed(nil)
     }
 
-    // MARK: - Reset
+    public func createRestorePoint() async throws -> URL {
+        let directory = try restorePointsDirectory()
+        return try await exportBackup(
+            to: directory,
+            packageName: "RestorePoint-\(formatDate(Date()))"
+        )
+    }
 
     public func resetState() {
         state = .idle
     }
 
-    // MARK: - Metadata Gathering
+    // MARK: - Snapshot Gathering
 
-    private func gatherMetadata() async throws -> BackupMetadata {
+    private func gatherLibrarySnapshot() async throws -> BackupLibrary {
         let scores = try modelContext.fetch(FetchDescriptor<Score>())
         let setlists = try modelContext.fetch(FetchDescriptor<SetList>())
 
@@ -147,10 +149,31 @@ public final class BackupRestoreService: ObservableObject {
                 key: score.key,
                 instrumentation: score.instrumentation,
                 difficulty: score.difficulty,
-                customTags: score.customTags,
+                duration: score.duration,
+                notes: score.notes,
                 isFavorite: score.isFavorite,
+                isArchived: score.isArchived,
+                customTags: score.customTags,
                 pageCount: score.pageCount,
-                fileHash: score.fileHash
+                fileHash: score.fileHash,
+                viewingPreferences: score.viewingPreferences,
+                assets: score.assets.map {
+                    BackupAsset(
+                        type: $0.type,
+                        fileName: $0.fileName,
+                        relativePath: $0.relativePath,
+                        fileSize: $0.fileSize,
+                        isPrimary: $0.isPrimary
+                    )
+                },
+                bookmarks: score.bookmarks.map {
+                    BackupBookmark(
+                        id: $0.id,
+                        name: $0.name,
+                        pageIndex: $0.pageIndex,
+                        sortOrder: $0.sortOrder
+                    )
+                }
             )
         }
 
@@ -158,75 +181,279 @@ public final class BackupRestoreService: ObservableObject {
             BackupSetlist(
                 id: setlist.id,
                 name: setlist.name,
-                scoreIDs: setlist.items.sorted(by: { $0.sortOrder < $1.sortOrder }).compactMap { $0.score?.id }
+                eventDescription: setlist.eventDescription,
+                eventDate: setlist.eventDate,
+                performanceNotes: setlist.performanceNotes,
+                stageNotes: setlist.stageNotes,
+                items: setlist.items.sorted(by: { $0.sortOrder < $1.sortOrder }).map { item in
+                    BackupSetlistItem(
+                        sortOrder: item.sortOrder,
+                        scoreHash: item.score?.fileHash,
+                        scoreTitle: item.score?.title ?? "",
+                        performanceNotes: item.performanceNotes,
+                        cueTitle: item.cueTitle,
+                        cueNotes: item.cueNotes,
+                        pauseDuration: item.pauseDuration,
+                        pauseNotes: item.pauseNotes,
+                        transitionStyle: item.transitionStyle,
+                        medleyTitle: item.medleyTitle,
+                        autoAdvanceDelay: item.autoAdvanceDelay,
+                        performancePreset: item.performancePreset
+                    )
+                }
             )
         }
 
-        return BackupMetadata(
-            version: 1,
-            createdAt: Date(),
-            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
-            scores: scoreEntries,
-            setlists: setlistEntries
-        )
+        return BackupLibrary(scores: scoreEntries, setlists: setlistEntries)
     }
 
-    private func restoreMetadata(_ metadata: BackupMetadata) throws {
-        // Scores — only import if not already present (by fileHash)
+    // MARK: - Restore
+
+    private func restoreLibraryFiles(from bundleURL: URL) throws {
+        let packageScoresDir = bundleURL.appendingPathComponent(importedScoresDirectoryName)
+        guard FileManager.default.fileExists(atPath: packageScoresDir.path) else { return }
+
+        let destinationDir = try importedScoresDirectory()
+        let files = try FileManager.default.contentsOfDirectory(at: packageScoresDir, includingPropertiesForKeys: nil)
+        for file in files {
+            let destination = destinationDir.appendingPathComponent(file.lastPathComponent)
+            if !FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.copyItem(at: file, to: destination)
+            }
+        }
+    }
+
+    private func restoreScores(_ backupScores: [BackupScore], strategy: RestoreStrategy) throws -> [String: Score] {
         let existingScores = try modelContext.fetch(FetchDescriptor<Score>())
-        let existingHashes = Set(existingScores.map(\.fileHash))
+        var scoresByHash = Dictionary(uniqueKeysWithValues: existingScores.map { ($0.fileHash, $0) })
 
-        for entry in metadata.scores {
-            guard !existingHashes.contains(entry.fileHash) else { continue }
+        for backupScore in backupScores {
+            if let existing = scoresByHash[backupScore.fileHash] {
+                switch strategy {
+                case .merge:
+                    merge(existing: existing, with: backupScore, replaceExisting: false)
+                case .replaceExisting:
+                    merge(existing: existing, with: backupScore, replaceExisting: true)
+                case .keepBoth:
+                    let copy = createScore(from: backupScore, keepBoth: true)
+                    modelContext.insert(copy)
+                    attachAssetsAndBookmarks(from: backupScore, to: copy)
+                    scoresByHash["\(backupScore.fileHash)-\(copy.id.uuidString)"] = copy
+                    continue
+                }
 
-            let score = Score(
-                title: entry.title,
-                composer: entry.composer,
-                arranger: entry.arranger,
-                genre: entry.genre,
-                key: entry.key,
-                instrumentation: entry.instrumentation,
-                difficulty: entry.difficulty,
-                pageCount: entry.pageCount,
-                fileHash: entry.fileHash
-            )
-            score.customTags = entry.customTags
-            score.isFavorite = entry.isFavorite
-            modelContext.insert(score)
+                attachAssetsAndBookmarks(from: backupScore, to: existing)
+                scoresByHash[backupScore.fileHash] = existing
+            } else {
+                let score = createScore(from: backupScore)
+                modelContext.insert(score)
+                attachAssetsAndBookmarks(from: backupScore, to: score)
+                scoresByHash[backupScore.fileHash] = score
+            }
         }
 
-        try modelContext.save()
+        return scoresByHash
+    }
+
+    private func restoreSetlists(_ backupSetlists: [BackupSetlist], scoreMap: [String: Score], strategy: RestoreStrategy) throws {
+        let existingSetlists = try modelContext.fetch(FetchDescriptor<SetList>())
+
+        for backupSetlist in backupSetlists {
+            let target: SetList
+            if let existing = existingSetlists.first(where: { $0.name == backupSetlist.name }) {
+                switch strategy {
+                case .replaceExisting:
+                    existing.eventDescription = backupSetlist.eventDescription
+                    existing.eventDate = backupSetlist.eventDate
+                    existing.performanceNotes = backupSetlist.performanceNotes
+                    existing.stageNotes = backupSetlist.stageNotes
+                    for item in existing.items {
+                        modelContext.delete(item)
+                    }
+                    target = existing
+                case .merge:
+                    target = existing
+                case .keepBoth:
+                    let copy = SetList(
+                        name: "\(backupSetlist.name) (Imported)",
+                        eventDescription: backupSetlist.eventDescription,
+                        performanceNotes: backupSetlist.performanceNotes,
+                        stageNotes: backupSetlist.stageNotes
+                    )
+                    copy.eventDate = backupSetlist.eventDate
+                    modelContext.insert(copy)
+                    target = copy
+                }
+            } else {
+                let setlist = SetList(
+                    name: backupSetlist.name,
+                    eventDescription: backupSetlist.eventDescription,
+                    performanceNotes: backupSetlist.performanceNotes,
+                    stageNotes: backupSetlist.stageNotes
+                )
+                setlist.eventDate = backupSetlist.eventDate
+                modelContext.insert(setlist)
+                target = setlist
+            }
+
+            let existingSignature: Set<String> = Set(target.items.compactMap { item in
+                guard let fileHash = item.score?.fileHash else { return nil }
+                return "\(fileHash)-\(item.sortOrder)"
+            })
+
+            for backupItem in backupSetlist.items {
+                guard let scoreHash = backupItem.scoreHash,
+                      let linkedScore = scoreMap[scoreHash] else { continue }
+
+                let signature = "\(scoreHash)-\(backupItem.sortOrder)"
+                if strategy == .merge && existingSignature.contains(signature) {
+                    continue
+                }
+
+                let item = SetListItem(
+                    sortOrder: backupItem.sortOrder,
+                    performanceNotes: backupItem.performanceNotes,
+                    cueTitle: backupItem.cueTitle,
+                    cueNotes: backupItem.cueNotes,
+                    pauseDuration: backupItem.pauseDuration,
+                    pauseNotes: backupItem.pauseNotes,
+                    transitionStyle: backupItem.transitionStyle,
+                    medleyTitle: backupItem.medleyTitle,
+                    autoAdvanceDelay: backupItem.autoAdvanceDelay,
+                    performancePreset: backupItem.performancePreset
+                )
+                item.setList = target
+                item.score = linkedScore
+                modelContext.insert(item)
+            }
+            target.modifiedAt = Date()
+        }
+    }
+
+    private func merge(existing score: Score, with backup: BackupScore, replaceExisting: Bool) {
+        if replaceExisting || score.title.isEmpty { score.title = backup.title }
+        if replaceExisting || score.composer.isEmpty { score.composer = backup.composer }
+        if replaceExisting || score.arranger.isEmpty { score.arranger = backup.arranger }
+        if replaceExisting || score.genre.isEmpty { score.genre = backup.genre }
+        if replaceExisting || score.key.isEmpty { score.key = backup.key }
+        if replaceExisting || score.instrumentation.isEmpty { score.instrumentation = backup.instrumentation }
+        if replaceExisting || score.notes.isEmpty { score.notes = backup.notes }
+        if replaceExisting || score.pageCount == 0 { score.pageCount = backup.pageCount }
+        if replaceExisting || score.duration == 0 { score.duration = backup.duration }
+        if replaceExisting || score.difficulty == 0 { score.difficulty = backup.difficulty }
+        if replaceExisting { score.isArchived = backup.isArchived }
+        score.isFavorite = score.isFavorite || backup.isFavorite
+        score.customTags = Array(Set(score.customTags + backup.customTags)).sorted()
+        if replaceExisting || score.viewingPreferences == nil {
+            score.viewingPreferences = backup.viewingPreferences
+        }
+        score.modifiedAt = Date()
+    }
+
+    private func createScore(from backup: BackupScore, keepBoth: Bool = false) -> Score {
+        let title = keepBoth ? "\(backup.title) (Imported)" : backup.title
+        let score = Score(
+            title: title,
+            composer: backup.composer,
+            arranger: backup.arranger,
+            genre: backup.genre,
+            key: backup.key,
+            instrumentation: backup.instrumentation,
+            difficulty: backup.difficulty,
+            duration: backup.duration,
+            notes: backup.notes,
+            pageCount: backup.pageCount,
+            fileHash: backup.fileHash
+        )
+        score.isFavorite = backup.isFavorite
+        score.isArchived = backup.isArchived
+        score.customTags = backup.customTags
+        score.viewingPreferences = backup.viewingPreferences
+        return score
+    }
+
+    private func attachAssetsAndBookmarks(from backup: BackupScore, to score: Score) {
+        let existingAssetPaths = Set(score.assets.map(\.relativePath))
+        for backupAsset in backup.assets where !existingAssetPaths.contains(backupAsset.relativePath) {
+            let asset = ScoreAsset(
+                type: backupAsset.type,
+                fileName: backupAsset.fileName,
+                relativePath: backupAsset.relativePath,
+                fileSize: backupAsset.fileSize,
+                isPrimary: backupAsset.isPrimary
+            )
+            asset.score = score
+            modelContext.insert(asset)
+        }
+
+        let existingBookmarks = Set(score.bookmarks.map { "\($0.pageIndex)-\($0.name)" })
+        for backupBookmark in backup.bookmarks where !existingBookmarks.contains("\(backupBookmark.pageIndex)-\(backupBookmark.name)") {
+            let bookmark = Bookmark(
+                name: backupBookmark.name,
+                pageIndex: backupBookmark.pageIndex,
+                sortOrder: backupBookmark.sortOrder
+            )
+            bookmark.score = score
+            modelContext.insert(bookmark)
+        }
+    }
+
+    // MARK: - Directories
+
+    private func appSupportDirectory() throws -> URL {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private func importedScoresDirectory() throws -> URL {
+        let directory = try appSupportDirectory().appendingPathComponent(importedScoresDirectoryName)
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        return directory
+    }
+
+    private func restorePointsDirectory() throws -> URL {
+        let directory = try appSupportDirectory().appendingPathComponent(restorePointsDirectoryName)
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        return directory
     }
 
     // MARK: - Helpers
 
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         return formatter.string(from: date)
     }
 
-    // MARK: - Errors
-
     public enum BackupError: Error, LocalizedError {
         case invalidBundle
-        case exportFailed(String)
 
         public var errorDescription: String? {
             switch self {
-            case .invalidBundle: "The backup file is invalid or corrupted."
-            case .exportFailed(let msg): "Export failed: \(msg)"
+            case .invalidBundle:
+                "The backup package is invalid or corrupted."
             }
         }
     }
 }
 
-// MARK: - Backup Models
+// MARK: - Transfer Models
 
-public struct BackupMetadata: Codable, Sendable {
+public struct BackupManifest: Codable, Sendable {
     public let version: Int
     public let createdAt: Date
     public let appVersion: String
+    public let scoreCount: Int
+    public let setlistCount: Int
+    public let bookmarkCount: Int
+}
+
+public struct BackupLibrary: Codable, Sendable {
     public let scores: [BackupScore]
     public let setlists: [BackupSetlist]
 }
@@ -240,14 +467,62 @@ public struct BackupScore: Codable, Sendable {
     public let key: String
     public let instrumentation: String
     public let difficulty: Int
-    public let customTags: [String]
+    public let duration: TimeInterval
+    public let notes: String
     public let isFavorite: Bool
+    public let isArchived: Bool
+    public let customTags: [String]
     public let pageCount: Int
     public let fileHash: String
+    public let viewingPreferences: ViewingPreferences?
+    public let assets: [BackupAsset]
+    public let bookmarks: [BackupBookmark]
+}
+
+public struct BackupAsset: Codable, Sendable {
+    public let type: ScoreAssetType
+    public let fileName: String
+    public let relativePath: String
+    public let fileSize: Int64
+    public let isPrimary: Bool
+}
+
+public struct BackupBookmark: Codable, Sendable {
+    public let id: UUID
+    public let name: String
+    public let pageIndex: Int
+    public let sortOrder: Int
 }
 
 public struct BackupSetlist: Codable, Sendable {
     public let id: UUID
     public let name: String
-    public let scoreIDs: [UUID]
+    public let eventDescription: String
+    public let eventDate: Date?
+    public let performanceNotes: String
+    public let stageNotes: String
+    public let items: [BackupSetlistItem]
+}
+
+public struct BackupSetlistItem: Codable, Sendable {
+    public let sortOrder: Int
+    public let scoreHash: String?
+    public let scoreTitle: String
+    public let performanceNotes: String
+    public let cueTitle: String
+    public let cueNotes: String
+    public let pauseDuration: TimeInterval
+    public let pauseNotes: String
+    public let transitionStyle: SetlistTransitionStyle
+    public let medleyTitle: String
+    public let autoAdvanceDelay: TimeInterval
+    public let performancePreset: SetlistPerformancePreset?
+}
+
+private extension JSONEncoder {
+    static var prettyPrinted: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }
 }

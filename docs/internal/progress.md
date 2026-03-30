@@ -184,3 +184,23 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - Start Sprint 5 from the parity matrix
 - Focus on real sync, backup, restore, export packages, and migration-safe recovery flows
+
+---
+
+## 2026-03-30 — Sprint 5 Complete: Sync / Backup / Export / Share
+
+**What changed:**
+- Replaced the old backup stub with a full package-based backup and restore service that exports library metadata, setlists, bookmarks, score assets, and imported files into a portable `.scorestagebackup` bundle
+- Added restore-point creation ahead of imports so destructive or conflicting restores have a local rollback path before library state is changed
+- Implemented restore strategies for merge, replace-existing, and keep-both workflows so backup imports can safely coexist with an existing library instead of assuming a blank target
+- Added a practical sync mirror flow that snapshots the current library, updates `SyncRecord` state, detects timestamp conflicts, and can import a mirrored library file back into local storage
+- Expanded Settings with real backup and restore controls, manual sync execution, conflict visibility, and restore-strategy selection so these workflows are accessible from the app instead of hidden in service code
+
+**Verification:**
+- `swift build` in `Packages/SyncFeature`
+- `swift build` in `Packages/LibraryFeature`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Start Sprint 6 from the parity matrix
+- Focus on pedal support, MIDI mapping, Bluetooth/external control, and live-performance hardware reliability
