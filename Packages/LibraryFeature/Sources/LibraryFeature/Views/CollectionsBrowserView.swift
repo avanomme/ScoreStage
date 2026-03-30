@@ -7,6 +7,7 @@ public enum BrowseMode: String, CaseIterable {
     case composers = "Composers"
     case genres = "Genres"
     case tags = "Tags"
+    case smart = "Smart Collections"
 }
 
 public struct CollectionsBrowserView: View {
@@ -26,6 +27,8 @@ public struct CollectionsBrowserView: View {
                 composersSection
             case .genres:
                 genresSection
+            case .smart:
+                smartCollectionsSection
             }
         }
         .scrollContentBackground(.hidden)
@@ -63,6 +66,31 @@ public struct CollectionsBrowserView: View {
         }
     }
 
+    private var smartCollectionsSection: some View {
+        ForEach(LibrarySmartCollection.allCases) { collection in
+            NavigationLink(collection.rawValue) {
+                filteredScoresList(title: collection.rawValue) { score in
+                    switch collection {
+                    case .importInbox:
+                        let opened = score.lastOpenedAt ?? score.createdAt
+                        return Calendar.current.dateComponents([.day], from: opened, to: Date()).day ?? 0 <= 7
+                    case .needsMetadata:
+                        return score.composer.isEmpty || score.genre.isEmpty || score.instrumentation.isEmpty || score.customTags.isEmpty
+                    case .rehearsalActive:
+                        guard let opened = score.lastOpenedAt else { return false }
+                        return Calendar.current.dateComponents([.day], from: opened, to: Date()).day ?? 99 <= 14
+                    case .performanceReady:
+                        return score.isFavorite || !score.bookmarks.isEmpty || !score.setListItems.isEmpty
+                    case .scannedLibrary:
+                        return score.assets.contains(where: { $0.type == .image }) ||
+                            score.title.localizedCaseInsensitiveContains("scan")
+                    }
+                }
+            }
+            .badge(smartCollectionCount(collection))
+        }
+    }
+
     private func filteredScoresList(title: String, predicate: @escaping (Score) -> Bool) -> some View {
         let filtered = scores.filter(predicate)
         return List(filtered) { score in
@@ -79,5 +107,25 @@ public struct CollectionsBrowserView: View {
             }
         }
         .navigationTitle(title)
+    }
+
+    private func smartCollectionCount(_ collection: LibrarySmartCollection) -> Int {
+        scores.filter { score in
+            switch collection {
+            case .importInbox:
+                let opened = score.lastOpenedAt ?? score.createdAt
+                return Calendar.current.dateComponents([.day], from: opened, to: Date()).day ?? 0 <= 7
+            case .needsMetadata:
+                return score.composer.isEmpty || score.genre.isEmpty || score.instrumentation.isEmpty || score.customTags.isEmpty
+            case .rehearsalActive:
+                guard let opened = score.lastOpenedAt else { return false }
+                return Calendar.current.dateComponents([.day], from: opened, to: Date()).day ?? 99 <= 14
+            case .performanceReady:
+                return score.isFavorite || !score.bookmarks.isEmpty || !score.setListItems.isEmpty
+            case .scannedLibrary:
+                return score.assets.contains(where: { $0.type == .image }) ||
+                    score.title.localizedCaseInsensitiveContains("scan")
+            }
+        }.count
     }
 }

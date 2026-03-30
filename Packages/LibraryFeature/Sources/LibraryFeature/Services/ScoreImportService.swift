@@ -92,7 +92,7 @@ public final class ScoreImportService: Sendable {
         }
     }
 
-    public struct ImportBatchResult: Sendable {
+    public struct ImportBatchResult {
         public var imported: [Score]
         public var mergedCount: Int
         public var replacedCount: Int

@@ -228,7 +228,10 @@ public final class ScoreScannerService {
     public func preparePageForScoreReading(_ image: UIImage) -> UIImage {
         let normalized = normalizeOrientation(image)
         let pageIsolated = cropToDetectedPage(normalized)
-        let borderTrimmed = trimBackgroundBorder(from: pageIsolated)
+        let normalizedWhites = normalizeWhitePoint(pageIsolated)
+        let despeckled = removeSpeckleNoise(from: normalizedWhites)
+        let contrastBalanced = balanceNotationContrast(despeckled)
+        let borderTrimmed = trimBackgroundBorder(from: contrastBalanced)
         return renderIntoStandardPage(borderTrimmed)
     }
 
@@ -336,6 +339,57 @@ public final class ScoreScannerService {
 
         guard let cropped = cgImage.cropping(to: cropRect) else { return image }
         return UIImage(cgImage: cropped, scale: image.scale, orientation: .up)
+    }
+
+    private func normalizeWhitePoint(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        let controls = CIFilter.colorControls()
+        controls.inputImage = ciImage
+        controls.brightness = 0.03
+        controls.contrast = 1.08
+        controls.saturation = 0
+
+        guard let output = controls.outputImage,
+              let cgImage = ciContext.createCGImage(output, from: output.extent) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
+    private func removeSpeckleNoise(from image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        let median = CIFilter.median()
+        median.inputImage = ciImage
+
+        guard let output = median.outputImage,
+              let cgImage = ciContext.createCGImage(output, from: output.extent) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
+    private func balanceNotationContrast(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        let colorControls = CIFilter.colorControls()
+        colorControls.inputImage = ciImage
+        colorControls.contrast = 1.18
+        colorControls.brightness = 0.01
+
+        let sharpen = CIFilter.sharpenLuminance()
+        sharpen.inputImage = colorControls.outputImage
+        sharpen.sharpness = 0.45
+
+        guard let output = sharpen.outputImage,
+              let cgImage = ciContext.createCGImage(output, from: output.extent) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
     }
 
     private func normalizeOrientation(_ image: UIImage) -> UIImage {

@@ -11,6 +11,198 @@ public enum LibraryFilter: Equatable {
     case recentlyPlayed
 }
 
+private struct LibraryImportReviewSheet: View {
+    @Binding var items: [ScoreImportService.ImportReviewItem]
+    @Environment(\.dismiss) private var dismiss
+    let onImport: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Review import decisions before anything touches the library. Duplicate matches can be merged or replaced instead of blindly copied.")
+                        .font(ASTypography.bodySmall)
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach($items) { $item in
+                    ImportReviewRow(item: $item)
+                }
+            }
+            .navigationTitle("Import Review")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Import") {
+                        onImport()
+                        dismiss()
+                    }
+                    .disabled(items.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+private struct ImportReviewRow: View {
+    @Binding var item: ScoreImportService.ImportReviewItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.sm) {
+            HStack(alignment: .top, spacing: ASSpacing.md) {
+                VStack(alignment: .leading, spacing: ASSpacing.xxs) {
+                    Text(item.title)
+                        .font(ASTypography.label)
+                    if !item.composer.isEmpty {
+                        Text(item.composer)
+                            .font(ASTypography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(item.fileName)
+                        .font(ASTypography.captionSmall)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                Text(ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
+                    .font(ASTypography.captionSmall)
+                    .foregroundStyle(.secondary)
+            }
+
+            Picker("Decision", selection: $item.decision.action) {
+                Text("Import").tag(ScoreImportService.ImportActionKind.importNew)
+                if !item.duplicateMatches.isEmpty {
+                    Text("Merge").tag(ScoreImportService.ImportActionKind.mergeIntoExisting)
+                    Text("Replace").tag(ScoreImportService.ImportActionKind.replaceExisting)
+                }
+                Text("Skip").tag(ScoreImportService.ImportActionKind.skip)
+            }
+            .pickerStyle(.segmented)
+
+            if !item.duplicateMatches.isEmpty {
+                Picker("Target", selection: targetBinding) {
+                    ForEach(item.duplicateMatches) { match in
+                        Text("\(match.title)\(match.composer.isEmpty ? "" : " • \(match.composer)")")
+                            .tag(Optional(match.scoreID))
+                    }
+                }
+                .pickerStyle(.menu)
+
+                VStack(alignment: .leading, spacing: ASSpacing.xxs) {
+                    ForEach(item.duplicateMatches) { match in
+                        Label(
+                            match.kind == .exactFile ? "Exact file already exists" : "Potential library match",
+                            systemImage: match.kind == .exactFile ? "doc.on.doc.fill" : "rectangle.3.group"
+                        )
+                        .font(ASTypography.captionSmall)
+                        .foregroundStyle(match.kind == .exactFile ? ASColors.warning : .secondary)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, ASSpacing.xs)
+        .onChange(of: item.decision.action) { _, newAction in
+            if item.decision.targetScoreID == nil {
+                item.decision.targetScoreID = item.duplicateMatches.first?.scoreID
+            }
+            if newAction == .importNew || newAction == .skip {
+                item.decision.targetScoreID = item.duplicateMatches.first?.scoreID
+            }
+        }
+    }
+
+    private var targetBinding: Binding<UUID?> {
+        Binding(
+            get: { item.decision.targetScoreID ?? item.duplicateMatches.first?.scoreID },
+            set: { item.decision.targetScoreID = $0 }
+        )
+    }
+}
+
+private struct BulkMetadataEditorSheet: View {
+    let scores: [Score]
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var composer = ""
+    @State private var genre = ""
+    @State private var instrumentation = ""
+    @State private var difficulty = 0
+    @State private var tags = ""
+    @State private var favoriteSelection = false
+    @State private var archiveSelection = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("\(scores.count) selected")
+                        .font(ASTypography.body)
+                }
+
+                Section("Apply Metadata") {
+                    TextField("Composer", text: $composer)
+                    TextField("Genre", text: $genre)
+                    TextField("Instrumentation", text: $instrumentation)
+                    Picker("Difficulty", selection: $difficulty) {
+                        Text("Keep Existing").tag(0)
+                        ForEach(1...10, id: \.self) { level in
+                            Text("\(level)").tag(level)
+                        }
+                    }
+                    TextField("Tags (comma separated)", text: $tags)
+                }
+
+                Section("Flags") {
+                    Toggle("Mark as favorite", isOn: $favoriteSelection)
+                    Toggle("Archive selection", isOn: $archiveSelection)
+                }
+            }
+            .navigationTitle("Bulk Metadata")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Apply") {
+                        applyChanges()
+                        dismiss()
+                    }
+                    .disabled(scores.isEmpty)
+                }
+            }
+        }
+    }
+
+    private func applyChanges() {
+        let newTags = tags
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        for score in scores {
+            if !composer.isEmpty { score.composer = composer }
+            if !genre.isEmpty { score.genre = genre }
+            if !instrumentation.isEmpty { score.instrumentation = instrumentation }
+            if difficulty > 0 { score.difficulty = difficulty }
+            if !newTags.isEmpty {
+                score.customTags = Array(Set(score.customTags + newTags)).sorted()
+            }
+            if favoriteSelection { score.isFavorite = true }
+            if archiveSelection { score.isArchived = true }
+            score.modifiedAt = Date()
+        }
+    }
+}
+
 public enum LibrarySortOrder: String, CaseIterable, Identifiable {
     case recent = "Recent"
     case title = "Title"
@@ -19,6 +211,26 @@ public enum LibrarySortOrder: String, CaseIterable, Identifiable {
     case difficulty = "Difficulty"
 
     public var id: String { rawValue }
+}
+
+public enum LibrarySmartCollection: String, CaseIterable, Identifiable {
+    case importInbox = "Import Inbox"
+    case needsMetadata = "Needs Metadata"
+    case rehearsalActive = "Rehearsal Active"
+    case performanceReady = "Performance Ready"
+    case scannedLibrary = "Scanned Scores"
+
+    public var id: String { rawValue }
+
+    public var icon: String {
+        switch self {
+        case .importInbox: "tray.full"
+        case .needsMetadata: "square.and.pencil"
+        case .rehearsalActive: "music.note.house"
+        case .performanceReady: "music.note.tv"
+        case .scannedLibrary: "doc.viewfinder"
+        }
+    }
 }
 
 // MARK: - View Model
@@ -44,12 +256,17 @@ public final class LibraryViewModel {
     public var showingImporter = false
     public var showingScanner = false
     public var importError: String?
+    public var importSummary: String?
     public var inspectedScore: Score?
     /// Set when user wants to open a score (double-tap / context menu).
     public var scoreToOpen: Score?
     /// Multi-select mode
     public var isSelecting = false
     public var selectedScoreIDs: Set<UUID> = []
+    public var activeSmartCollection: LibrarySmartCollection?
+    public var importReviewItems: [ScoreImportService.ImportReviewItem] = []
+    public var showingImportReview = false
+    public var showingBulkEditor = false
 
     public init() {}
 
@@ -69,7 +286,29 @@ public final class LibraryViewModel {
             filtered = filtered.filter {
                 $0.title.lowercased().contains(query) ||
                 $0.composer.lowercased().contains(query) ||
+                $0.genre.lowercased().contains(query) ||
+                $0.instrumentation.lowercased().contains(query) ||
                 $0.customTags.contains { $0.lowercased().contains(query) }
+            }
+        }
+
+        if let activeSmartCollection {
+            filtered = filtered.filter { score in
+                switch activeSmartCollection {
+                case .importInbox:
+                    let opened = score.lastOpenedAt ?? score.createdAt
+                    return Calendar.current.dateComponents([.day], from: opened, to: Date()).day ?? 0 <= 7
+                case .needsMetadata:
+                    return score.composer.isEmpty || score.genre.isEmpty || score.instrumentation.isEmpty || score.customTags.isEmpty
+                case .rehearsalActive:
+                    guard let opened = score.lastOpenedAt else { return false }
+                    return Calendar.current.dateComponents([.day], from: opened, to: Date()).day ?? 99 <= 14
+                case .performanceReady:
+                    return score.isFavorite || !score.bookmarks.isEmpty || !score.setListItems.isEmpty
+                case .scannedLibrary:
+                    return score.assets.contains(where: { $0.type == .image }) ||
+                        score.title.localizedCaseInsensitiveContains("scan")
+                }
             }
         }
 
@@ -150,7 +389,8 @@ public struct LibraryHomeView: View {
         .scoreFileImporter(isPresented: $viewModel.showingImporter) { urls in
             Task {
                 do {
-                    let _ = try await importService.importFiles(from: urls, into: modelContext)
+                    viewModel.importReviewItems = try await importService.previewImport(from: urls, into: modelContext)
+                    viewModel.showingImportReview = !viewModel.importReviewItems.isEmpty
                 } catch {
                     viewModel.importError = error.localizedDescription
                 }
@@ -179,6 +419,16 @@ public struct LibraryHomeView: View {
                 Text(error)
             }
         }
+        .alert("Import Summary", isPresented: Binding(
+            get: { viewModel.importSummary != nil },
+            set: { if !$0 { viewModel.importSummary = nil } }
+        )) {
+            Button("OK") { viewModel.importSummary = nil }
+        } message: {
+            if let summary = viewModel.importSummary {
+                Text(summary)
+            }
+        }
         .onChange(of: viewModel.scoreToOpen?.id) { _, newValue in
             if let score = viewModel.scoreToOpen {
                 viewModel.scoreToOpen = nil
@@ -192,6 +442,23 @@ public struct LibraryHomeView: View {
             if let score = viewModel.inspectedScore {
                 ScoreInspectorPanel(score: score)
             }
+        }
+        .sheet(isPresented: $viewModel.showingImportReview) {
+            LibraryImportReviewSheet(items: $viewModel.importReviewItems) {
+                Task {
+                    do {
+                        let result = try await importService.importReviewedFiles(viewModel.importReviewItems, into: modelContext)
+                        viewModel.importSummary = importSummary(from: result)
+                        viewModel.showingImportReview = false
+                        viewModel.importReviewItems = []
+                    } catch {
+                        viewModel.importError = error.localizedDescription
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $viewModel.showingBulkEditor) {
+            BulkMetadataEditorSheet(scores: selectedScores(from: sorted))
         }
     }
 
@@ -223,6 +490,7 @@ public struct LibraryHomeView: View {
                 if filter == .all {
                     libraryHero(sorted)
                     quickCommandDeck(sorted)
+                    smartCollectionsStrip
                     continueShelf(sorted)
                     spotlightGenreStrip(sorted)
                 }
@@ -282,6 +550,7 @@ public struct LibraryHomeView: View {
                 if filter == .all {
                     libraryHero(sorted)
                     quickCommandDeck(sorted)
+                    smartCollectionsStrip
                 }
 
                 librarySectionHeader(
@@ -351,6 +620,30 @@ public struct LibraryHomeView: View {
         }
     }
 
+    private func selectedScores(from sorted: [Score]) -> [Score] {
+        sorted.filter { viewModel.selectedScoreIDs.contains($0.id) }
+    }
+
+    private func importSummary(from result: ScoreImportService.ImportBatchResult) -> String {
+        var parts: [String] = []
+        if !result.imported.isEmpty {
+            parts.append("\(result.imported.count) imported")
+        }
+        if result.mergedCount > 0 {
+            parts.append("\(result.mergedCount) merged")
+        }
+        if result.replacedCount > 0 {
+            parts.append("\(result.replacedCount) replaced")
+        }
+        if result.skippedCount > 0 {
+            parts.append("\(result.skippedCount) skipped")
+        }
+        if !result.failedFiles.isEmpty {
+            parts.append("\(result.failedFiles.count) failed")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     // MARK: - Selection Action Bar
 
     private func selectionActionBar(_ sorted: [Score]) -> some View {
@@ -385,6 +678,19 @@ public struct LibraryHomeView: View {
             } label: {
                 Image(systemName: "heart")
                     .font(.system(size: 16))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            Button {
+                viewModel.showingBulkEditor = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 14))
+                    Text("Bulk Edit")
+                        .font(ASTypography.labelSmall)
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -469,6 +775,16 @@ public struct LibraryHomeView: View {
                 Picker("Sort", selection: $viewModel.sortOrder) {
                     ForEach(LibrarySortOrder.allCases) { order in
                         Text(order.rawValue).tag(order)
+                    }
+                }
+                Divider()
+                Picker("Smart Collection", selection: Binding(
+                    get: { viewModel.activeSmartCollection },
+                    set: { viewModel.activeSmartCollection = $0 }
+                )) {
+                    Text("All Scores").tag(LibrarySmartCollection?.none)
+                    ForEach(LibrarySmartCollection.allCases) { collection in
+                        Text(collection.rawValue).tag(Optional(collection))
                     }
                 }
             } label: {
@@ -715,6 +1031,52 @@ public struct LibraryHomeView: View {
                         .stroke(ASColors.chromeBorder, lineWidth: 1)
                 )
         )
+    }
+
+    private var smartCollectionsStrip: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            librarySectionHeader(
+                title: "Smart Collections",
+                subtitle: "Saved library slices for cleanup, rehearsal prep, and stage-ready material."
+            )
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: ASSpacing.md) {
+                    smartCollectionChip(title: "All Scores", icon: "square.grid.2x2", isActive: viewModel.activeSmartCollection == nil) {
+                        viewModel.activeSmartCollection = nil
+                    }
+
+                    ForEach(LibrarySmartCollection.allCases) { collection in
+                        smartCollectionChip(
+                            title: collection.rawValue,
+                            icon: collection.icon,
+                            isActive: viewModel.activeSmartCollection == collection
+                        ) {
+                            viewModel.activeSmartCollection = collection
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func smartCollectionChip(title: String, icon: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(ASTypography.labelSmall)
+                .padding(.horizontal, ASSpacing.md)
+                .padding(.vertical, ASSpacing.sm)
+                .background(
+                    Capsule()
+                        .fill(isActive ? ASColors.accentFallback.opacity(0.14) : ASColors.chromeSurface.opacity(0.84))
+                        .overlay(
+                            Capsule()
+                                .stroke(isActive ? ASColors.accentFallback.opacity(0.4) : ASColors.chromeBorder, lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? ASColors.accentFallback : .secondary)
     }
 
     private func quickCommandDeck(_ sorted: [Score]) -> some View {
