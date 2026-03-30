@@ -222,6 +222,8 @@ public struct LibraryHomeView: View {
             VStack(alignment: .leading, spacing: ASSpacing.xxl) {
                 if filter == .all {
                     libraryHero(sorted)
+                    quickCommandDeck(sorted)
+                    continueShelf(sorted)
                     spotlightGenreStrip(sorted)
                 }
 
@@ -279,6 +281,7 @@ public struct LibraryHomeView: View {
             VStack(alignment: .leading, spacing: ASSpacing.xl) {
                 if filter == .all {
                     libraryHero(sorted)
+                    quickCommandDeck(sorted)
                 }
 
                 librarySectionHeader(
@@ -562,38 +565,26 @@ public struct LibraryHomeView: View {
         }.count
         let favoritesCount = scores.filter(\.isFavorite).count
         let scannedCount = scores.filter { $0.title.localizedCaseInsensitiveContains("scanned") }.count
+        let linkedCount = scores.filter { !$0.setListItems.isEmpty }.count
+        let nextUp = sorted.first(where: { $0.lastOpenedAt != nil }) ?? sorted.first
 
         return VStack(alignment: .leading, spacing: ASSpacing.xl) {
-            HStack(alignment: .top, spacing: ASSpacing.xl) {
-                VStack(alignment: .leading, spacing: ASSpacing.md) {
-                    Text("Stage library")
-                        .font(ASTypography.displayMedium)
-                        .foregroundStyle(ASColors.textPrimaryDark)
-
-                    Text("Organize charts, rehearsal copies, and performance editions in a workspace that feels closer to a pro music tool than a file browser.")
-                        .font(ASTypography.body)
-                        .foregroundStyle(ASColors.textSecondaryDark)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: ASSpacing.sm) {
-                        heroActionButton(title: "Import Score", systemImage: "square.and.arrow.down") {
-                            viewModel.showingImporter = true
-                        }
-                        #if os(iOS)
-                        heroActionButton(title: "Scan Sheet", systemImage: "camera.viewfinder") {
-                            viewModel.showingScanner = true
-                        }
-                        #endif
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: ASSpacing.xl) {
+                    heroIntro
+                    heroNowPanel(nextUp: nextUp, linkedCount: linkedCount)
                 }
 
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: ASSpacing.lg) {
+                    heroIntro
+                    heroNowPanel(nextUp: nextUp, linkedCount: linkedCount)
+                }
             }
 
             HStack(spacing: ASSpacing.md) {
-                heroStatCard(value: "\(scores.count)", title: "Total Scores", detail: "\(favoritesCount) favorites")
-                heroStatCard(value: "\(recentCount)", title: "Used This Week", detail: "Keep active repertoire ready")
-                heroStatCard(value: "\(scannedCount)", title: "Scanned Imports", detail: "Clean for print-style reading")
+                heroStatCard(value: "\(scores.count)", title: "Library", detail: "\(favoritesCount) favorites")
+                heroStatCard(value: "\(recentCount)", title: "This Week", detail: "Active rehearsal material")
+                heroStatCard(value: "\(scannedCount)", title: "Scanned", detail: "Cleaned for score reading")
             }
         }
         .padding(ASSpacing.screenPadding)
@@ -612,6 +603,69 @@ public struct LibraryHomeView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: ASRadius.xl, style: .continuous)
                         .stroke(ASColors.accentFallback.opacity(0.22), lineWidth: 1)
+                )
+        )
+    }
+
+    private var heroIntro: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            Text("Stage library")
+                .font(ASTypography.displayMedium)
+                .foregroundStyle(ASColors.textPrimaryDark)
+
+            Text("A cleaner command center for repertoire, rehearsal copies, and performance-ready scans.")
+                .font(ASTypography.body)
+                .foregroundStyle(ASColors.textSecondaryDark)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: ASSpacing.sm) {
+                heroActionButton(title: "Import Score", systemImage: "square.and.arrow.down") {
+                    viewModel.showingImporter = true
+                }
+                #if os(iOS)
+                heroActionButton(title: "Scan Sheet", systemImage: "camera.viewfinder") {
+                    viewModel.showingScanner = true
+                }
+                #endif
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func heroNowPanel(nextUp: Score?, linkedCount: Int) -> some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            Text("Now")
+                .font(ASTypography.labelMicro)
+                .tracking(1.0)
+                .foregroundStyle(ASColors.accentFallback)
+
+            if let nextUp {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text(nextUp.title)
+                        .font(ASTypography.heading2)
+                        .foregroundStyle(ASColors.textPrimaryDark)
+                        .lineLimit(2)
+                    Text(nextUp.composer.isEmpty ? "Ready to open" : nextUp.composer)
+                        .font(ASTypography.bodySmall)
+                        .foregroundStyle(ASColors.textSecondaryDark)
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(spacing: ASSpacing.sm) {
+                miniInsight(title: "Linked", value: "\(linkedCount)")
+                miniInsight(title: "View", value: viewModel.viewMode.rawValue)
+                miniInsight(title: "Sort", value: viewModel.sortOrder.rawValue)
+            }
+        }
+        .frame(maxWidth: 340, alignment: .leading)
+        .padding(ASSpacing.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                        .stroke(ASColors.chromeBorder, lineWidth: 1)
                 )
         )
     }
@@ -660,6 +714,141 @@ public struct LibraryHomeView: View {
                     RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
                         .stroke(ASColors.chromeBorder, lineWidth: 1)
                 )
+        )
+    }
+
+    private func quickCommandDeck(_ sorted: [Score]) -> some View {
+        let recent = sorted.first(where: { $0.lastOpenedAt != nil })
+        let favorite = scores.first(where: \.isFavorite)
+
+        return VStack(alignment: .leading, spacing: ASSpacing.md) {
+            librarySectionHeader(
+                title: "Quick Actions",
+                subtitle: "Categorized actions reduce friction and match what premium pro apps are doing now."
+            )
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: ASSpacing.md) {
+                    commandCard(
+                        title: "Continue Reading",
+                        subtitle: recent?.title ?? "Open your most recent score",
+                        icon: "play.rectangle",
+                        accent: ASColors.info
+                    ) {
+                        if let recent { viewModel.scoreToOpen = recent }
+                    }
+
+                    commandCard(
+                        title: "Import & Organize",
+                        subtitle: "Bring in PDFs and keep metadata tidy",
+                        icon: "square.and.arrow.down.on.square",
+                        accent: ASColors.accentFallback
+                    ) {
+                        viewModel.showingImporter = true
+                    }
+
+                    commandCard(
+                        title: "Open Favorite",
+                        subtitle: favorite?.title ?? "Jump to pinned repertoire",
+                        icon: "heart.text.square",
+                        accent: ASColors.warning
+                    ) {
+                        if let favorite { viewModel.scoreToOpen = favorite }
+                    }
+                }
+
+                VStack(spacing: ASSpacing.md) {
+                    commandCard(
+                        title: "Continue Reading",
+                        subtitle: recent?.title ?? "Open your most recent score",
+                        icon: "play.rectangle",
+                        accent: ASColors.info
+                    ) {
+                        if let recent { viewModel.scoreToOpen = recent }
+                    }
+
+                    commandCard(
+                        title: "Import & Organize",
+                        subtitle: "Bring in PDFs and keep metadata tidy",
+                        icon: "square.and.arrow.down.on.square",
+                        accent: ASColors.accentFallback
+                    ) {
+                        viewModel.showingImporter = true
+                    }
+
+                    commandCard(
+                        title: "Open Favorite",
+                        subtitle: favorite?.title ?? "Jump to pinned repertoire",
+                        icon: "heart.text.square",
+                        accent: ASColors.warning
+                    ) {
+                        if let favorite { viewModel.scoreToOpen = favorite }
+                    }
+                }
+            }
+        }
+    }
+
+    private func continueShelf(_ sorted: [Score]) -> some View {
+        let recentScores = sorted.filter { $0.lastOpenedAt != nil }.prefix(4)
+        guard !recentScores.isEmpty else { return AnyView(EmptyView()) }
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: ASSpacing.md) {
+                librarySectionHeader(
+                    title: "Continue",
+                    subtitle: "Glanceable shelves help users resume work quickly."
+                )
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: ASSpacing.md) {
+                        ForEach(Array(recentScores), id: \.id) { score in
+                            Button {
+                                viewModel.scoreToOpen = score
+                            } label: {
+                                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                                    Text(score.title)
+                                        .font(ASTypography.heading3)
+                                        .foregroundStyle(ASColors.textPrimaryDark)
+                                        .lineLimit(2)
+
+                                    Text(score.composer.isEmpty ? "Score ready" : score.composer)
+                                        .font(ASTypography.caption)
+                                        .foregroundStyle(ASColors.textSecondaryDark)
+                                        .lineLimit(1)
+
+                                    HStack(spacing: ASSpacing.xs) {
+                                        Image(systemName: "clock.arrow.circlepath")
+                                        Text(relativeTimestamp(for: score.lastOpenedAt ?? score.createdAt))
+                                    }
+                                    .font(ASTypography.monoMicro)
+                                    .foregroundStyle(ASColors.accentFallback)
+                                }
+                                .frame(width: 220, alignment: .leading)
+                                .padding(ASSpacing.cardPadding)
+                                .background(
+                                    RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.05),
+                                                    ASColors.chromeSurfaceElevated
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                                                .stroke(ASColors.chromeBorder, lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
         )
     }
 
@@ -721,6 +910,71 @@ public struct LibraryHomeView: View {
                 }
             }
         )
+    }
+
+    private func commandCard(title: String, subtitle: String, icon: String, accent: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: ASSpacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                        .fill(accent.opacity(0.14))
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(accent)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text(title)
+                        .font(ASTypography.heading3)
+                        .foregroundStyle(ASColors.textPrimaryDark)
+                    Text(subtitle)
+                        .font(ASTypography.caption)
+                        .foregroundStyle(ASColors.textSecondaryDark)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+            .padding(ASSpacing.cardPadding)
+            .background(
+                RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.055),
+                                ASColors.chromeSurfaceElevated
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                            .stroke(ASColors.chromeBorder, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func miniInsight(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title.uppercased())
+                .font(ASTypography.labelMicro)
+                .tracking(0.9)
+                .foregroundStyle(ASColors.textTertiaryDark)
+            Text(value)
+                .font(ASTypography.bodySmall)
+                .foregroundStyle(ASColors.textPrimaryDark)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func relativeTimestamp(for date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     private func librarySectionHeader(title: String, subtitle: String) -> some View {
