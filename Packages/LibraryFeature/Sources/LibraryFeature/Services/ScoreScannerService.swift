@@ -43,12 +43,13 @@ public final class ScoreScannerService {
 
     /// Apply an enhancement filter to a scanned page image.
     public func enhance(_ image: UIImage, filter: EnhancementFilter) -> UIImage {
-        guard let ciImage = CIImage(image: image) else { return image }
+        let prepared = preparePageForScoreReading(image)
+        guard let ciImage = CIImage(image: prepared) else { return prepared }
 
         let filtered: CIImage
         switch filter {
         case .original:
-            return image
+            return prepared
         case .blackAndWhite:
             filtered = applyAdaptiveThreshold(ciImage)
         case .grayscale:
@@ -60,9 +61,10 @@ public final class ScoreScannerService {
         }
 
         guard let cgImage = ciContext.createCGImage(filtered, from: filtered.extent) else {
-            return image
+            return prepared
         }
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        let enhanced = UIImage(cgImage: cgImage, scale: prepared.scale, orientation: .up)
+        return renderIntoStandardPage(enhanced)
     }
 
     // MARK: - Filters
@@ -125,18 +127,22 @@ public final class ScoreScannerService {
     /// Compile an array of page images into a single PDF file.
     /// Returns the URL of the generated PDF in a temporary directory.
     public func compileToPDF(pages: [UIImage], title: String) throws -> URL {
+        guard !pages.isEmpty else {
+            throw ScanError.noPages
+        }
+
         let pdfDocument = PDFDocument()
 
         for (index, image) in pages.enumerated() {
-            // Render at high quality for print-like output
-            let targetSize = optimizedPageSize(for: image)
+            let prepared = renderIntoStandardPage(preparePageForScoreReading(image))
+            let targetSize = optimizedPageSize(for: prepared)
             let renderer = UIGraphicsImageRenderer(size: targetSize)
             let rendered = renderer.image { ctx in
-                // White background
                 UIColor.white.setFill()
                 ctx.fill(CGRect(origin: .zero, size: targetSize))
-                // Draw image scaled to fit
-                image.draw(in: CGRect(origin: .zero, size: targetSize))
+
+                let drawRect = aspectFitRect(for: prepared.size, in: CGRect(origin: .zero, size: targetSize).insetBy(dx: 90, dy: 90))
+                prepared.draw(in: drawRect)
             }
 
             guard let pdfPage = PDFPage(image: rendered) else { continue }
@@ -164,54 +170,20 @@ public final class ScoreScannerService {
 
     /// Calculate optimal page size maintaining aspect ratio at high DPI.
     private func optimizedPageSize(for image: UIImage) -> CGSize {
-        let maxDimension: CGFloat = 3300 // ~11" at 300 DPI (letter size)
-        let size = image.size
-        let scale = min(maxDimension / size.width, maxDimension / size.height, 1.0)
-        return CGSize(width: size.width * scale, height: size.height * scale)
+        let portrait = image.size.height >= image.size.width
+        return portrait ? CGSize(width: 2550, height: 3300) : CGSize(width: 3300, height: 2550)
     }
 
     // MARK: - Deskew & Perspective Correction
 
     /// Auto-detect document edges and apply perspective correction.
     public func autoDeskew(_ image: UIImage) -> UIImage {
-        guard let ciImage = CIImage(image: image) else { return image }
-
-        // Use CIDetector for rectangle detection
-        let detector = CIDetector(ofType: CIDetectorTypeRectangle, context: ciContext, options: [
-            CIDetectorAccuracy: CIDetectorAccuracyHigh,
-            CIDetectorAspectRatio: 1.41 // A4/Letter aspect ratio hint
-        ])
-
-        guard let features = detector?.features(in: ciImage),
-              let rect = features.first as? CIRectangleFeature else {
-            // No rectangle detected — try just straightening
-            return autoStraighten(image)
-        }
-
-        // Apply perspective correction
-        let corrected = ciImage.applyingFilter("CIPerspectiveCorrection", parameters: [
-            "inputTopLeft": CIVector(cgPoint: rect.topLeft),
-            "inputTopRight": CIVector(cgPoint: rect.topRight),
-            "inputBottomLeft": CIVector(cgPoint: rect.bottomLeft),
-            "inputBottomRight": CIVector(cgPoint: rect.bottomRight)
-        ])
-
-        guard let cgImage = ciContext.createCGImage(corrected, from: corrected.extent) else {
-            return image
-        }
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        preparePageForScoreReading(image)
     }
 
     /// Auto-straighten a slightly rotated image.
     public func autoStraighten(_ image: UIImage) -> UIImage {
-        guard let ciImage = CIImage(image: image) else { return image }
-        let straightened = ciImage.applyingFilter("CIStraightenFilter", parameters: [
-            "inputAngle": 0 // Auto-detect angle
-        ])
-        guard let cgImage = ciContext.createCGImage(straightened, from: straightened.extent) else {
-            return image
-        }
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        preparePageForScoreReading(image)
     }
 
     /// Crop an image to the given normalized rect (0-1 range).
@@ -247,7 +219,159 @@ public final class ScoreScannerService {
         guard let cgImage = ciContext.createCGImage(corrected, from: corrected.extent) else {
             return image
         }
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        return renderIntoStandardPage(UIImage(cgImage: cgImage, scale: image.scale, orientation: .up))
+    }
+
+    // MARK: - Score Cleanup Pipeline
+
+    /// Produces a clean single-page result from a camera capture before filtering or export.
+    public func preparePageForScoreReading(_ image: UIImage) -> UIImage {
+        let normalized = normalizeOrientation(image)
+        let pageIsolated = cropToDetectedPage(normalized)
+        let borderTrimmed = trimBackgroundBorder(from: pageIsolated)
+        return renderIntoStandardPage(borderTrimmed)
+    }
+
+    private func cropToDetectedPage(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image),
+              let rect = bestDocumentRectangle(in: ciImage) else {
+            return image
+        }
+
+        let corrected = ciImage.applyingFilter("CIPerspectiveCorrection", parameters: [
+            "inputTopLeft": CIVector(cgPoint: rect.topLeft),
+            "inputTopRight": CIVector(cgPoint: rect.topRight),
+            "inputBottomLeft": CIVector(cgPoint: rect.bottomLeft),
+            "inputBottomRight": CIVector(cgPoint: rect.bottomRight)
+        ])
+
+        guard let cgImage = ciContext.createCGImage(corrected, from: corrected.extent.integral) else {
+            return image
+        }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
+    private func bestDocumentRectangle(in image: CIImage) -> CIRectangleFeature? {
+        let detector = CIDetector(ofType: CIDetectorTypeRectangle, context: ciContext, options: [
+            CIDetectorAccuracy: CIDetectorAccuracyHigh,
+            CIDetectorAspectRatio: 1.41,
+            CIDetectorMinFeatureSize: 0.2
+        ])
+
+        let candidates = detector?.features(in: image).compactMap { $0 as? CIRectangleFeature } ?? []
+        return candidates.max { lhs, rhs in
+            rectangleScore(lhs) < rectangleScore(rhs)
+        }
+    }
+
+    private func rectangleScore(_ rect: CIRectangleFeature) -> CGFloat {
+        let width = max(distance(from: rect.topLeft, to: rect.topRight), distance(from: rect.bottomLeft, to: rect.bottomRight))
+        let height = max(distance(from: rect.topLeft, to: rect.bottomLeft), distance(from: rect.topRight, to: rect.bottomRight))
+        let area = width * height
+        let aspectPenalty = abs((height / max(width, 1)) - 1.41) * 5000
+        return area - aspectPenalty
+    }
+
+    private func distance(from lhs: CGPoint, to rhs: CGPoint) -> CGFloat {
+        hypot(lhs.x - rhs.x, lhs.y - rhs.y)
+    }
+
+    private func trimBackgroundBorder(from image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        let bitsPerComponent = 8
+        var pixels = [UInt8](repeating: 0, count: Int(height * bytesPerRow))
+
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return image
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var minX = width
+        var minY = height
+        var maxX = 0
+        var maxY = 0
+
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = y * bytesPerRow + x * bytesPerPixel
+                let r = CGFloat(pixels[offset])
+                let g = CGFloat(pixels[offset + 1])
+                let b = CGFloat(pixels[offset + 2])
+                let alpha = CGFloat(pixels[offset + 3])
+                let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+                if alpha > 10, luminance < 247 {
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+
+        guard minX < maxX, minY < maxY else { return image }
+
+        let paddingX = max(Int(CGFloat(maxX - minX) * 0.035), 24)
+        let paddingY = max(Int(CGFloat(maxY - minY) * 0.035), 24)
+        let cropRect = CGRect(
+            x: max(minX - paddingX, 0),
+            y: max(minY - paddingY, 0),
+            width: min(maxX - minX + (paddingX * 2), width - max(minX - paddingX, 0)),
+            height: min(maxY - minY + (paddingY * 2), height - max(minY - paddingY, 0))
+        ).integral
+
+        guard let cropped = cgImage.cropping(to: cropRect) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: .up)
+    }
+
+    private func normalizeOrientation(_ image: UIImage) -> UIImage {
+        guard image.imageOrientation != .up else { return image }
+
+        let renderer = UIGraphicsImageRenderer(size: image.size)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
+    }
+
+    private func renderIntoStandardPage(_ image: UIImage) -> UIImage {
+        let portrait = image.size.height >= image.size.width
+        let canvasSize = portrait ? CGSize(width: 2550, height: 3300) : CGSize(width: 3300, height: 2550)
+        let contentRect = CGRect(origin: .zero, size: canvasSize).insetBy(dx: 120, dy: 120)
+        let drawRect = aspectFitRect(for: image.size, in: contentRect)
+
+        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        return renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: canvasSize))
+            image.draw(in: drawRect)
+        }
+    }
+
+    private func aspectFitRect(for sourceSize: CGSize, in bounds: CGRect) -> CGRect {
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return bounds }
+
+        let scale = min(bounds.width / sourceSize.width, bounds.height / sourceSize.height)
+        let size = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        return CGRect(
+            x: bounds.midX - (size.width / 2),
+            y: bounds.midY - (size.height / 2),
+            width: size.width,
+            height: size.height
+        )
     }
 
     // MARK: - Errors

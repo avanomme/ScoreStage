@@ -54,6 +54,9 @@ public final class PlaybackEngine {
     /// Callback when playback position updates (fires per measure).
     public var onMeasureChanged: ((Int) -> Void)?
 
+    /// Callback every frame with (currentTime, totalDuration) for smooth progress.
+    public var onTimeUpdate: ((TimeInterval, TimeInterval) -> Void)?
+
     /// Callback when playback completes.
     public var onPlaybackComplete: (() -> Void)?
 
@@ -94,6 +97,16 @@ public final class PlaybackEngine {
         )
 
         setupAudioEngine()
+
+        // Set MIDI programs per part (different instruments)
+        if let sampler {
+            for (index, part) in score.parts.enumerated() {
+                let channel = UInt8(min(index, 15)) // MIDI channels 0-15 (skip 9 for drums)
+                let program = UInt8(part.midiProgram)
+                // Send program change
+                sampler.sendProgramChange(program, onChannel: channel)
+            }
+        }
     }
 
     private func setupAudioEngine() {
@@ -335,6 +348,9 @@ public final class PlaybackEngine {
                     }
                 }
 
+                // Fire continuous time update for smooth UI
+                self.onTimeUpdate?(elapsed, self.measureMap?.totalDuration ?? 0)
+
                 try? await Task.sleep(for: .milliseconds(8)) // ~120Hz update rate
             }
         }
@@ -352,20 +368,25 @@ public final class PlaybackEngine {
             let isSoloActive = soloPart != nil
             let shouldPlay = !isMuted && (!isSoloActive || soloPart == event.partIndex)
 
+            let channel = UInt8(min(event.partIndex, 15))
+
             if shouldPlay {
                 switch event.type {
                 case .noteOn:
                     let volume = partVolumes.indices.contains(event.partIndex)
                         ? partVolumes[event.partIndex] : 1.0
                     let adjustedVelocity = UInt8(min(127, Float(event.velocity) * volume))
-                    sampler.startNote(UInt8(event.midiNote), withVelocity: adjustedVelocity, onChannel: 0)
+                    sampler.startNote(UInt8(event.midiNote), withVelocity: adjustedVelocity, onChannel: channel)
 
                 case .noteOff:
-                    sampler.stopNote(UInt8(event.midiNote), onChannel: 0)
+                    sampler.stopNote(UInt8(event.midiNote), onChannel: channel)
 
                 case .tempoChange, .measureStart:
                     break
                 }
+            } else if event.type == .noteOff {
+                // Always process note-off even if muted to avoid stuck notes
+                sampler.stopNote(UInt8(event.midiNote), onChannel: channel)
             }
 
             eventIndex += 1
@@ -389,8 +410,11 @@ public final class PlaybackEngine {
 
     private func allNotesOff() {
         guard let sampler else { return }
-        for note: UInt8 in 0...127 {
-            sampler.stopNote(note, onChannel: 0)
+        let channelCount = UInt8(min(score?.parts.count ?? 1, 16))
+        for ch: UInt8 in 0..<channelCount {
+            for note: UInt8 in 0...127 {
+                sampler.stopNote(note, onChannel: ch)
+            }
         }
     }
 

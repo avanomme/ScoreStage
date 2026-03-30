@@ -107,25 +107,25 @@ struct ContentView: View {
         } detail: {
             detailContent(for: selectedItem ?? .library)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(ASColors.chromeBackground)
+                .background(detailBackdrop)
         }
         .tint(ASColors.accentFallback)
     }
 
     private var sidebarContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // App title
-                Text("ScoreStage")
-                    .font(ASTypography.heading2)
-                    .foregroundStyle(ASColors.textPrimaryDark)
-                    .padding(.horizontal, ASSpacing.lg)
-                    .padding(.top, ASSpacing.xl)
-                    .padding(.bottom, ASSpacing.lg)
+        ZStack {
+            sidebarBackdrop
 
-                ForEach(LibrarySidebarItem.SidebarSection.allCases, id: \.self) { section in
-                    let items = LibrarySidebarItem.allCases.filter { $0.section == section }
-                    sidebarSection(section, items: items)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    sidebarHeader
+
+                    ForEach(LibrarySidebarItem.SidebarSection.allCases, id: \.self) { section in
+                        let items = LibrarySidebarItem.allCases.filter { $0.section == section }
+                        sidebarSection(section, items: items)
+                    }
+
+                    sidebarFooter
                 }
             }
         }
@@ -136,13 +136,12 @@ struct ContentView: View {
     @ViewBuilder
     private func sidebarSection(_ section: LibrarySidebarItem.SidebarSection, items: [LibrarySidebarItem]) -> some View {
         VStack(alignment: .leading, spacing: ASSpacing.xxs) {
-            // Section header
             Text(section.rawValue)
                 .font(ASTypography.labelMicro)
                 .foregroundStyle(ASColors.textTertiaryDark)
-                .tracking(0.5)
+                .tracking(1.2)
                 .padding(.horizontal, ASSpacing.lg)
-                .padding(.top, ASSpacing.lg)
+                .padding(.top, ASSpacing.xl)
                 .padding(.bottom, ASSpacing.xs)
 
             ForEach(items) { item in
@@ -161,8 +160,16 @@ struct ContentView: View {
             HStack(spacing: ASSpacing.md) {
                 Image(systemName: item.icon)
                     .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(isSelected ? ASColors.accentFallback : ASColors.textSecondaryDark)
+                    .foregroundStyle(isSelected ? ASColors.textPrimaryDark : ASColors.textSecondaryDark)
                     .frame(width: 22)
+                    .overlay(alignment: .leading) {
+                        if isSelected {
+                            Capsule()
+                                .fill(ASColors.accentFallback)
+                                .frame(width: 3, height: 20)
+                                .offset(x: -12)
+                        }
+                    }
 
                 Text(item.title)
                     .font(ASTypography.bodySmall)
@@ -174,11 +181,178 @@ struct ContentView: View {
             .padding(.vertical, ASSpacing.sm)
             .background(
                 RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
-                    .fill(isSelected ? ASColors.chromeSurfaceSelected : Color.clear)
+                    .fill(
+                        isSelected
+                            ? LinearGradient(
+                                colors: [
+                                    ASColors.accentFallback.opacity(0.18),
+                                    ASColors.chromeSurfaceSelected
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.02),
+                                    Color.clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                            .stroke(isSelected ? ASColors.accentFallback.opacity(0.4) : ASColors.chromeBorder.opacity(0.5), lineWidth: 1)
+                    )
             )
             .padding(.horizontal, ASSpacing.sm)
         }
         .buttonStyle(.plain)
+    }
+
+    private var sidebarHeader: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text("ScoreStage")
+                        .font(ASTypography.displaySmall)
+                        .foregroundStyle(ASColors.textPrimaryDark)
+
+                    Text("Performance library")
+                        .font(ASTypography.labelSmall)
+                        .foregroundStyle(ASColors.accentFallback)
+                        .textCase(.uppercase)
+                        .tracking(1.1)
+                }
+
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .fill(ASColors.accentFallback.opacity(0.16))
+                    Image(systemName: "metronome.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ASColors.accentFallback)
+                }
+                .frame(width: 40, height: 40)
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Built for rehearsal rooms, pits, and concert stages.")
+                    .font(ASTypography.bodySmall)
+                    .foregroundStyle(ASColors.textSecondaryDark)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: ASSpacing.sm) {
+                    sidebarBadge("Library", icon: "music.note.list")
+                    sidebarBadge("Reader", icon: "book.pages")
+                }
+            }
+        }
+        .padding(ASSpacing.screenPadding)
+        .background(
+            RoundedRectangle(cornerRadius: ASRadius.xl, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.06),
+                            ASColors.chromeSurfaceElevated.opacity(0.88)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: ASRadius.xl, style: .continuous)
+                        .stroke(ASColors.accentFallback.opacity(0.18), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, ASSpacing.md)
+        .padding(.top, ASSpacing.md)
+    }
+
+    private func sidebarBadge(_ title: String, icon: String) -> some View {
+        HStack(spacing: ASSpacing.xs) {
+            Image(systemName: icon)
+            Text(title)
+        }
+        .font(ASTypography.monoMicro)
+        .foregroundStyle(ASColors.textSecondaryDark)
+        .padding(.horizontal, ASSpacing.sm)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+
+    private var sidebarFooter: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.sm) {
+            Divider()
+                .overlay(ASColors.chromeBorderStrong)
+                .padding(.bottom, ASSpacing.sm)
+
+            Text("Stage-ready by design")
+                .font(ASTypography.heading3)
+                .foregroundStyle(ASColors.textPrimaryDark)
+
+            Text("Setlists, annotations, playback, and linked performance views live in one workspace.")
+                .font(ASTypography.caption)
+                .foregroundStyle(ASColors.textSecondaryDark)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(ASSpacing.screenPadding)
+    }
+
+    private var sidebarBackdrop: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    ASColors.chromeBackground,
+                    ASColors.chromeSurface
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    ASColors.accentFallback.opacity(0.18),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 320
+            )
+            .offset(x: -30, y: -50)
+        }
+        .ignoresSafeArea()
+    }
+
+    private var detailBackdrop: some View {
+        ZStack {
+            ASColors.chromeBackground
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.18)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [
+                    ASColors.accentFallback.opacity(0.08),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 10,
+                endRadius: 400
+            )
+        }
+        .ignoresSafeArea()
     }
 
     // MARK: - Compact Layout (iPhone)

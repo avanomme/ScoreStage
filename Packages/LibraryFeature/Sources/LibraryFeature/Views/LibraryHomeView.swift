@@ -132,7 +132,7 @@ public struct LibraryHomeView: View {
                         message: emptyMessage
                     )
                 } else {
-                    scoreGrid(sorted)
+                    scoreCollection(sorted)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -143,7 +143,7 @@ public struct LibraryHomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ASColors.chromeBackground)
+        .background(libraryBackdrop)
         .navigationTitle(navigationTitle)
         .searchable(text: $viewModel.searchText, prompt: "Search scores, composers, tags...")
         .toolbar { libraryToolbar }
@@ -198,6 +198,16 @@ public struct LibraryHomeView: View {
     // MARK: - Score Grid / List
 
     @ViewBuilder
+    private func scoreCollection(_ sorted: [Score]) -> some View {
+        switch viewModel.viewMode {
+        case .grid:
+            scoreGridView(sorted)
+        case .list:
+            scoreListView(sorted)
+        }
+    }
+
+    @ViewBuilder
     private func scoreGrid(_ sorted: [Score]) -> some View {
         switch viewModel.viewMode {
         case .grid:
@@ -209,42 +219,53 @@ public struct LibraryHomeView: View {
 
     private func scoreGridView(_ sorted: [Score]) -> some View {
         ScrollView {
-            LazyVGrid(columns: gridColumns, spacing: ASSpacing.cardGap) {
-                ForEach(sorted) { score in
-                    ZStack(alignment: .topLeading) {
-                        ScoreCoverCard(
-                            score: score,
-                            isSelected: viewModel.isSelecting
-                                ? viewModel.selectedScoreIDs.contains(score.id)
-                                : viewModel.inspectedScore?.id == score.id
-                        )
+            VStack(alignment: .leading, spacing: ASSpacing.xxl) {
+                if filter == .all {
+                    libraryHero(sorted)
+                    spotlightGenreStrip(sorted)
+                }
 
-                        // Selection checkmark overlay
-                        if viewModel.isSelecting {
-                            Image(systemName: viewModel.selectedScoreIDs.contains(score.id)
-                                  ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(viewModel.selectedScoreIDs.contains(score.id)
-                                                 ? ASColors.accentFallback : .white.opacity(0.7))
-                                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
-                                .padding(8)
-                        }
-                    }
-                    .onTapGesture(count: 2) {
-                        if !viewModel.isSelecting {
-                            viewModel.scoreToOpen = score
-                        }
-                    }
-                    .onTapGesture {
-                        if viewModel.isSelecting {
-                            toggleScoreSelection(score.id)
-                        } else {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                viewModel.inspectedScore = score
+                librarySectionHeader(
+                    title: viewModel.searchText.isEmpty ? "Your Scores" : "Search Results",
+                    subtitle: sectionSummary(for: sorted)
+                )
+
+                LazyVGrid(columns: gridColumns, spacing: ASSpacing.cardGap) {
+                    ForEach(sorted) { score in
+                        ZStack(alignment: .topLeading) {
+                            ScoreCoverCard(
+                                score: score,
+                                isSelected: viewModel.isSelecting
+                                    ? viewModel.selectedScoreIDs.contains(score.id)
+                                    : viewModel.inspectedScore?.id == score.id
+                            )
+
+                            if viewModel.isSelecting {
+                                Image(systemName: viewModel.selectedScoreIDs.contains(score.id)
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(viewModel.selectedScoreIDs.contains(score.id)
+                                                     ? ASColors.accentFallback : .white.opacity(0.7))
+                                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                                    .padding(8)
                             }
                         }
+                        .onTapGesture(count: 2) {
+                            if !viewModel.isSelecting {
+                                viewModel.scoreToOpen = score
+                            }
+                        }
+                        .onTapGesture {
+                            if viewModel.isSelecting {
+                                toggleScoreSelection(score.id)
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.inspectedScore = score
+                                }
+                            }
+                        }
+                        .contextMenu { scoreContextMenu(for: score) }
                     }
-                    .contextMenu { scoreContextMenu(for: score) }
                 }
             }
             .padding(ASSpacing.screenPadding)
@@ -254,47 +275,69 @@ public struct LibraryHomeView: View {
     }
 
     private func scoreListView(_ sorted: [Score]) -> some View {
-        List(sorted) { score in
-            HStack(spacing: ASSpacing.md) {
-                if viewModel.isSelecting {
-                    Image(systemName: viewModel.selectedScoreIDs.contains(score.id)
-                          ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(viewModel.selectedScoreIDs.contains(score.id)
-                                         ? ASColors.accentFallback : Color.gray.opacity(0.4))
+        ScrollView {
+            VStack(alignment: .leading, spacing: ASSpacing.xl) {
+                if filter == .all {
+                    libraryHero(sorted)
                 }
 
-                ScoreListRow(score: score, isSelected: !viewModel.isSelecting && viewModel.inspectedScore?.id == score.id)
-            }
-            .listRowInsets(EdgeInsets(top: 4, leading: ASSpacing.md, bottom: 4, trailing: ASSpacing.md))
-            .listRowSeparator(.hidden)
-            .listRowBackground(
-                RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
-                    .fill(
-                        viewModel.isSelecting
-                            ? (viewModel.selectedScoreIDs.contains(score.id) ? ASColors.accentFallback.opacity(0.06) : Color.clear)
-                            : (viewModel.inspectedScore?.id == score.id ? ASColors.chromeSurfaceSelected : Color.clear)
-                    )
-                    .padding(.horizontal, ASSpacing.xs)
-            )
-            .onTapGesture(count: 2) {
-                if !viewModel.isSelecting {
-                    viewModel.scoreToOpen = score
-                }
-            }
-            .onTapGesture {
-                if viewModel.isSelecting {
-                    toggleScoreSelection(score.id)
-                } else {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.inspectedScore = score
+                librarySectionHeader(
+                    title: viewModel.searchText.isEmpty ? "Library List" : "Matched Scores",
+                    subtitle: sectionSummary(for: sorted)
+                )
+
+                LazyVStack(spacing: ASSpacing.sm) {
+                    ForEach(sorted) { score in
+                        HStack(spacing: ASSpacing.md) {
+                            if viewModel.isSelecting {
+                                Image(systemName: viewModel.selectedScoreIDs.contains(score.id)
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(viewModel.selectedScoreIDs.contains(score.id)
+                                                     ? ASColors.accentFallback : Color.gray.opacity(0.4))
+                            }
+
+                            ScoreListRow(score: score, isSelected: !viewModel.isSelecting && viewModel.inspectedScore?.id == score.id)
+                        }
+                        .padding(.horizontal, ASSpacing.md)
+                        .padding(.vertical, ASSpacing.sm)
+                        .background(
+                            RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                                .fill(
+                                    viewModel.isSelecting
+                                        ? (viewModel.selectedScoreIDs.contains(score.id) ? ASColors.accentFallback.opacity(0.08) : ASColors.chromeSurface.opacity(0.84))
+                                        : (viewModel.inspectedScore?.id == score.id ? ASColors.chromeSurfaceSelected : ASColors.chromeSurface.opacity(0.84))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                                        .stroke(
+                                            viewModel.inspectedScore?.id == score.id
+                                                ? ASColors.accentFallback.opacity(0.35)
+                                                : ASColors.chromeBorder.opacity(0.8),
+                                            lineWidth: 1
+                                        )
+                                )
+                        )
+                        .onTapGesture(count: 2) {
+                            if !viewModel.isSelecting {
+                                viewModel.scoreToOpen = score
+                            }
+                        }
+                        .onTapGesture {
+                            if viewModel.isSelecting {
+                                toggleScoreSelection(score.id)
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.inspectedScore = score
+                                }
+                            }
+                        }
+                        .contextMenu { scoreContextMenu(for: score) }
                     }
                 }
             }
-            .contextMenu { scoreContextMenu(for: score) }
+            .padding(ASSpacing.screenPadding)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
     }
 
     private func toggleScoreSelection(_ id: UUID) {
@@ -368,9 +411,9 @@ public struct LibraryHomeView: View {
 
     private var gridColumns: [GridItem] {
         #if os(macOS)
-        [GridItem(.adaptive(minimum: 170, maximum: 210), spacing: ASSpacing.cardGap)]
+        [GridItem(.adaptive(minimum: 190, maximum: 230), spacing: ASSpacing.cardGap)]
         #else
-        [GridItem(.adaptive(minimum: 140, maximum: 170), spacing: ASSpacing.lg)]
+        [GridItem(.adaptive(minimum: 156, maximum: 196), spacing: ASSpacing.lg)]
         #endif
     }
 
@@ -487,6 +530,224 @@ public struct LibraryHomeView: View {
         case .recentlyPlayed: "Scores you've recently opened will appear here."
         }
     }
+
+    private var libraryBackdrop: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    ASColors.chromeBackground,
+                    ASColors.chromeSurface.opacity(0.96)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    ASColors.accentFallback.opacity(0.14),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 420
+            )
+        }
+        .ignoresSafeArea()
+    }
+
+    private func libraryHero(_ sorted: [Score]) -> some View {
+        let recentCount = sorted.filter {
+            guard let opened = $0.lastOpenedAt else { return false }
+            return Calendar.current.isDate(opened, equalTo: Date(), toGranularity: .weekOfYear)
+        }.count
+        let favoritesCount = scores.filter(\.isFavorite).count
+        let scannedCount = scores.filter { $0.title.localizedCaseInsensitiveContains("scanned") }.count
+
+        return VStack(alignment: .leading, spacing: ASSpacing.xl) {
+            HStack(alignment: .top, spacing: ASSpacing.xl) {
+                VStack(alignment: .leading, spacing: ASSpacing.md) {
+                    Text("Stage library")
+                        .font(ASTypography.displayMedium)
+                        .foregroundStyle(ASColors.textPrimaryDark)
+
+                    Text("Organize charts, rehearsal copies, and performance editions in a workspace that feels closer to a pro music tool than a file browser.")
+                        .font(ASTypography.body)
+                        .foregroundStyle(ASColors.textSecondaryDark)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: ASSpacing.sm) {
+                        heroActionButton(title: "Import Score", systemImage: "square.and.arrow.down") {
+                            viewModel.showingImporter = true
+                        }
+                        #if os(iOS)
+                        heroActionButton(title: "Scan Sheet", systemImage: "camera.viewfinder") {
+                            viewModel.showingScanner = true
+                        }
+                        #endif
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: ASSpacing.md) {
+                heroStatCard(value: "\(scores.count)", title: "Total Scores", detail: "\(favoritesCount) favorites")
+                heroStatCard(value: "\(recentCount)", title: "Used This Week", detail: "Keep active repertoire ready")
+                heroStatCard(value: "\(scannedCount)", title: "Scanned Imports", detail: "Clean for print-style reading")
+            }
+        }
+        .padding(ASSpacing.screenPadding)
+        .background(
+            RoundedRectangle(cornerRadius: ASRadius.xl, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.06),
+                            ASColors.chromeSurfaceElevated.opacity(0.95)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: ASRadius.xl, style: .continuous)
+                        .stroke(ASColors.accentFallback.opacity(0.22), lineWidth: 1)
+                )
+        )
+    }
+
+    private func heroActionButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(ASTypography.label)
+                .padding(.horizontal, ASSpacing.lg)
+                .padding(.vertical, ASSpacing.sm)
+                .background(
+                    Capsule()
+                        .fill(ASColors.accentFallback.opacity(0.14))
+                        .overlay(
+                            Capsule()
+                                .stroke(ASColors.accentFallback.opacity(0.35), lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(ASColors.textPrimaryDark)
+    }
+
+    private func heroStatCard(value: String, title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: ASSpacing.xs) {
+            Text(value)
+                .font(ASTypography.displaySmall)
+                .foregroundStyle(ASColors.textPrimaryDark)
+
+            Text(title.uppercased())
+                .font(ASTypography.labelMicro)
+                .tracking(1.0)
+                .foregroundStyle(ASColors.accentFallback)
+
+            Text(detail)
+                .font(ASTypography.caption)
+                .foregroundStyle(ASColors.textSecondaryDark)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(ASSpacing.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                .fill(Color.white.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                        .stroke(ASColors.chromeBorder, lineWidth: 1)
+                )
+        )
+    }
+
+    private func spotlightGenreStrip(_ sorted: [Score]) -> some View {
+        let topGenres = Dictionary(grouping: sorted.filter { !$0.genre.isEmpty }, by: \.genre)
+            .map { ($0.key, $0.value.count) }
+            .sorted { lhs, rhs in
+                if lhs.1 == rhs.1 { return lhs.0 < rhs.0 }
+                return lhs.1 > rhs.1
+            }
+            .prefix(4)
+
+        guard !topGenres.isEmpty else {
+            return AnyView(EmptyView())
+        }
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: ASSpacing.md) {
+                librarySectionHeader(
+                    title: "Spotlight Collections",
+                    subtitle: "Quick pivots into the parts of your repertoire that matter now."
+                )
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: ASSpacing.md) {
+                        ForEach(Array(topGenres), id: \.0) { genre, count in
+                            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                                Text(genre)
+                                    .font(ASTypography.heading3)
+                                    .foregroundStyle(ASColors.textPrimaryDark)
+                                Text("\(count) scores")
+                                    .font(ASTypography.caption)
+                                    .foregroundStyle(ASColors.textSecondaryDark)
+                                Image(systemName: "waveform.and.magnifyingglass")
+                                    .font(.system(size: 20, weight: .light))
+                                    .foregroundStyle(ASColors.accentFallback)
+                            }
+                            .frame(width: 180, alignment: .leading)
+                            .padding(ASSpacing.cardPadding)
+                            .background(
+                                RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                ASColors.chromeSurfaceElevated,
+                                                ASColors.chromeSurface
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                                            .stroke(ASColors.chromeBorder, lineWidth: 1)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private func librarySectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: ASSpacing.xs) {
+            Text(title)
+                .font(ASTypography.heading1)
+                .foregroundStyle(ASColors.textPrimaryDark)
+            Text(subtitle)
+                .font(ASTypography.bodySmall)
+                .foregroundStyle(ASColors.textSecondaryDark)
+        }
+    }
+
+    private func sectionSummary(for sorted: [Score]) -> String {
+        if !viewModel.searchText.isEmpty {
+            return "\(sorted.count) results for “\(viewModel.searchText)”"
+        }
+
+        switch filter {
+        case .all:
+            return "Recent imports, polished editions, and performance copies in one workspace."
+        case .favorites:
+            return "Pinned repertoire you want within one tap."
+        case .recentlyPlayed:
+            return "Your last-opened scores, ready for the next rehearsal."
+        }
+    }
 }
 
 // MARK: - Score Cover Card (Album Art Style — spec Section E.2)
@@ -495,57 +756,77 @@ struct ScoreCoverCard: View {
     let score: Score
     let isSelected: Bool
     @State private var isHovering = false
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ASSpacing.sm) {
-            // Cover thumbnail — resembles album art / score cover
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: colorScheme == .dark
-                                ? [ASColors.cardGradientTopDark, ASColors.cardGradientBottomDark]
-                                : [ASColors.cardGradientTopLight, ASColors.cardGradientBottomLight],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .fill(scoreCardGradient)
                     .aspectRatio(0.77, contentMode: .fit)
+                    .overlay(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(ASColors.accentFallback.opacity(0.88))
+                            .frame(height: 8)
+                    }
                     .overlay {
-                        VStack(spacing: ASSpacing.sm) {
-                            Image(systemName: "music.note")
-                                .font(.system(size: 28, weight: .ultraLight))
-                                .foregroundStyle(ASColors.tertiaryText)
+                        VStack(alignment: .leading, spacing: ASSpacing.md) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(score.genre.isEmpty ? "Performance Copy" : score.genre.uppercased())
+                                        .font(ASTypography.monoMicro)
+                                        .tracking(0.8)
+                                        .foregroundStyle(ASColors.accentFallback.opacity(0.95))
 
-                            Text(score.title)
-                                .font(ASTypography.cardTitle)
-                                .foregroundStyle(ASColors.secondaryText)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-                                .padding(.horizontal, ASSpacing.sm)
+                                    if score.pageCount > 0 {
+                                        Text("\(score.pageCount) pages")
+                                            .font(ASTypography.captionSmall)
+                                            .foregroundStyle(ASColors.textTertiaryDark)
+                                    }
+                                }
 
-                            if !score.composer.isEmpty {
-                                Text(score.composer)
-                                    .font(ASTypography.cardSubtitle)
-                                    .foregroundStyle(ASColors.tertiaryText)
+                                Spacer()
+
+                                Image(systemName: "music.quarternote.3")
+                                    .font(.system(size: 16, weight: .light))
+                                    .foregroundStyle(ASColors.textTertiaryDark)
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                                Text(score.title)
+                                    .font(ASTypography.displaySmall)
+                                    .foregroundStyle(ASColors.textPrimaryDark)
+                                    .lineLimit(3)
+                                    .minimumScaleFactor(0.8)
+
+                                if !score.composer.isEmpty {
+                                    Text(score.composer)
+                                        .font(ASTypography.bodySmall)
+                                        .foregroundStyle(ASColors.textSecondaryDark)
+                                        .lineLimit(2)
+                                }
+                            }
+
+                            HStack(spacing: ASSpacing.xs) {
+                                scoreCardBadge(score.instrumentation.isEmpty ? "Solo" : score.instrumentation)
+                                if score.duration > 0 {
+                                    scoreCardBadge(formatDuration(score.duration))
+                                }
                             }
                         }
+                        .padding(ASSpacing.cardPadding)
                     }
                     .overlay(
                         RoundedRectangle(cornerRadius: ASRadius.card, style: .continuous)
-                            .strokeBorder(
-                                isSelected ? ASColors.accentFallback : Color.clear,
-                                lineWidth: 2.5
-                            )
+                            .strokeBorder(isSelected ? ASColors.accentFallback : ASColors.chromeBorder.opacity(0.8), lineWidth: isSelected ? 2.5 : 1)
                     )
                     .shadow(
-                        color: .black.opacity(isHovering ? 0.18 : 0.10),
-                        radius: isHovering ? 14 : 6,
-                        y: isHovering ? 6 : 3
+                        color: .black.opacity(isHovering ? 0.24 : 0.14),
+                        radius: isHovering ? 18 : 10,
+                        y: isHovering ? 10 : 5
                     )
 
-                // Favorite badge — 24pt circle, accent at 90%
                 if score.isFavorite {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 10, weight: .semibold))
@@ -558,24 +839,17 @@ struct ScoreCoverCard: View {
                 }
             }
 
-            // Metadata below cover
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(score.title)
-                    .font(ASTypography.cardMetaTitle)
-                    .foregroundStyle(.primary)
+                    .font(ASTypography.heading3)
+                    .foregroundStyle(ASColors.textPrimaryDark)
                     .lineLimit(1)
 
                 if !score.composer.isEmpty {
                     Text(score.composer)
-                        .font(ASTypography.cardMetaSubtitle)
-                        .foregroundStyle(.secondary)
+                        .font(ASTypography.caption)
+                        .foregroundStyle(ASColors.textSecondaryDark)
                         .lineLimit(1)
-                }
-
-                if score.duration > 0 {
-                    Text(formatDuration(score.duration))
-                        .font(ASTypography.captionSmall)
-                        .foregroundStyle(.tertiary)
                 }
             }
         }
@@ -591,6 +865,31 @@ struct ScoreCoverCard: View {
         let mins = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return secs > 0 ? "\(mins):\(String(format: "%02d", secs))" : "\(mins) min"
+    }
+
+    private var scoreCardGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                ASColors.chromeSurfaceElevated,
+                ASColors.chromeSurface,
+                ASColors.chromeBackground
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private func scoreCardBadge(_ title: String) -> some View {
+        Text(title)
+            .font(ASTypography.monoMicro)
+            .foregroundStyle(ASColors.textSecondaryDark)
+            .padding(.horizontal, ASSpacing.sm)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.05))
+            )
+            .lineLimit(1)
     }
 }
 

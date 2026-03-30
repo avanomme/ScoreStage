@@ -119,6 +119,7 @@ public final class DeviceLinkService: NSObject {
     public var isAdvertising = false
     public var isBrowsing = false
     public var currentPageIndex: Int = 0
+    public var openedScoreID: UUID?
 
     /// Callback for received link messages.
     public var onMessageReceived: ((LinkMessage) -> Void)?
@@ -191,6 +192,8 @@ public final class DeviceLinkService: NSObject {
         stopBrowsing()
         connectedPeers.removeAll()
         discoveredPeers.removeAll()
+        currentPageIndex = 0
+        openedScoreID = nil
     }
 
     // MARK: - Messaging
@@ -208,6 +211,26 @@ public final class DeviceLinkService: NSObject {
     public func sendPageChange(to pageIndex: Int) {
         currentPageIndex = pageIndex
         sendMessage(.pageChanged(pageIndex: pageIndex))
+    }
+
+    public func sendOpenedScore(_ scoreID: UUID, pageIndex: Int = 0) {
+        openedScoreID = scoreID
+        currentPageIndex = pageIndex
+        sendMessage(.scoreOpened(scoreID: scoreID))
+        sendMessage(.pageChanged(pageIndex: pageIndex))
+    }
+
+    public var isLinked: Bool {
+        !connectedPeers.isEmpty
+    }
+
+    public var connectionSummary: String {
+        if connectedPeers.isEmpty {
+            return isBrowsing || isAdvertising ? "Scanning for devices" : "Not linked"
+        }
+
+        let peerNames = connectedPeers.map(\.displayName).joined(separator: ", ")
+        return "Linked with \(peerNames)"
     }
 }
 
@@ -250,8 +273,19 @@ extension DeviceLinkService: MCSessionDelegate {
         switch message {
         case .pageChanged(let pageIndex):
             currentPageIndex = pageIndex
+        case .displayModeChanged(let mode):
+            if let linkedMode = LinkedDisplayMode(rawValue: mode) {
+                displayMode = linkedMode
+            }
+        case .roleAssignment(let role):
+            if let assignedRole = DeviceRole(rawValue: role) {
+                localRole = assignedRole
+            }
+        case .scoreOpened(let scoreID):
+            openedScoreID = scoreID
         case .sessionEnded:
             connectedPeers.removeAll()
+            openedScoreID = nil
         default:
             break
         }

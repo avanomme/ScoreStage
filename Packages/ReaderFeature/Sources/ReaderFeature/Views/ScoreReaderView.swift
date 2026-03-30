@@ -5,6 +5,7 @@ import DesignSystem
 import AnnotationFeature
 import PlaybackFeature
 import NotationFeature
+import DeviceLinkFeature
 
 /// Reader Environment — sacred full-screen score display.
 /// No persistent toolbars. Controls appear as floating translucent overlay on interaction.
@@ -26,7 +27,12 @@ public struct ScoreReaderView: View {
     @State private var showingPlayback = false
     @State private var showingMixer = false
     @State private var showingRehearsalMarks = false
+    @State private var showingBarJump = false
+    @State private var barJumpText = ""
     @State private var playbackProgress: Double = 0
+    @State private var linkService = DeviceLinkService()
+    @State private var showingDeviceLinkSheet = false
+    @State private var suppressLinkedBroadcast = false
 
     // Setlist navigation
     let setlistItems: [SetListItem]?
@@ -53,6 +59,13 @@ public struct ScoreReaderView: View {
     }
 
     private var hasPlaybackData: Bool { normalizedScore != nil }
+    private var isLinkedSessionActive: Bool { linkService.isLinked }
+    private var isLinkedTwoScreenSpread: Bool {
+        isLinkedSessionActive && linkService.displayMode == .twoPageSpread
+    }
+    private var canBroadcastPageChanges: Bool {
+        isLinkedSessionActive && linkService.localRole != .secondary && !suppressLinkedBroadcast
+    }
 
     public var body: some View {
         ZStack {
@@ -188,6 +201,7 @@ public struct ScoreReaderView: View {
             viewModel.markAsOpened()
             loadAnnotations()
             setupAnnotationCallbacks()
+            configureDeviceLink()
             await loadPlaybackData()
         }
         .onDisappear {
@@ -195,6 +209,25 @@ public struct ScoreReaderView: View {
             saveAnnotations()
             playbackEngine.stop()
             playbackEngine.shutdown()
+            linkService.disconnect()
+        }
+        .onChange(of: viewModel.currentPageIndex) { _, newValue in
+            guard canBroadcastPageChanges else { return }
+            let pageToSend = linkService.displayMode == .twoPageSpread
+                ? max(0, newValue - (newValue % 2))
+                : newValue
+            linkService.sendPageChange(to: pageToSend)
+        }
+        .onChange(of: linkService.currentPageIndex) { _, newValue in
+            syncToLinkedPage(newValue)
+        }
+        .onChange(of: linkService.connectedPeers.count) { _, newValue in
+            if newValue > 0 {
+                linkService.sendOpenedScore(viewModel.score.id, pageIndex: normalizedSpreadBase(viewModel.currentPageIndex))
+            }
+        }
+        .sheet(isPresented: $showingDeviceLinkSheet) {
+            DevicePairingView(linkService: linkService)
         }
         #if os(macOS)
         .onHover { hovering in
@@ -230,7 +263,10 @@ public struct ScoreReaderView: View {
                 // Wire measure change callback for auto-page-turn
                 playbackEngine.onMeasureChanged = { measure in
                     autoPageTurn(forMeasure: measure)
-                    updatePlaybackProgress()
+                }
+                // Continuous time update for smooth playhead
+                playbackEngine.onTimeUpdate = { time, total in
+                    updatePlaybackProgress(currentTime: time, totalDuration: total)
                 }
                 playbackEngine.onPlaybackComplete = {
                     withAnimation { showingPlayback = false }
@@ -255,15 +291,19 @@ public struct ScoreReaderView: View {
     @ViewBuilder
     private var readerContent: some View {
         GeometryReader { geo in
-            switch viewModel.displayMode {
-            case .singlePage:
-                singlePageView(in: geo.size)
-            case .horizontalPaged:
-                horizontalPagedView
-            case .verticalScroll:
-                verticalScrollView
-            case .twoPageSpread:
-                twoPageSpreadView(in: geo.size)
+            if isLinkedTwoScreenSpread {
+                linkedTwoScreenSpreadView(in: geo.size)
+            } else {
+                switch viewModel.displayMode {
+                case .singlePage:
+                    singlePageView(in: geo.size)
+                case .horizontalPaged:
+                    horizontalPagedView
+                case .verticalScroll:
+                    verticalScrollView
+                case .twoPageSpread:
+                    twoPageSpreadView(in: geo.size)
+                }
             }
         }
     }
@@ -347,6 +387,27 @@ public struct ScoreReaderView: View {
         .gesture(annotationState.isAnnotating ? nil : pageTurnTapGesture(in: size))
     }
 
+    private func linkedTwoScreenSpreadView(in size: CGSize) -> some View {
+        TwoDeviceSpreadView(linkService: linkService, pageCount: viewModel.pageCount) { index in
+            PDFPageView(
+                image: viewModel.renderedPages[index],
+                pageSize: viewModel.pageSize(at: index)
+            )
+            .scaleEffect(viewModel.zoomScale)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task {
+                if viewModel.renderedPages[index] == nil {
+                    if let img = await viewModel.renderService.renderPage(at: index) {
+                        viewModel.renderedPages[index] = img
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .gesture(annotationState.isAnnotating || linkService.localRole == .secondary ? nil : linkedSpreadTapGesture(in: size))
+    }
+
     // MARK: - Page Turn Gesture
 
     private func pageTurnTapGesture(in size: CGSize) -> some Gesture {
@@ -359,6 +420,25 @@ public struct ScoreReaderView: View {
                     Task { await viewModel.previousPage() }
                 } else {
                     // Center tap toggles controls
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showingControls.toggle()
+                    }
+                    if showingControls { scheduleControlsHide() }
+                }
+            }
+    }
+
+    private func linkedSpreadTapGesture(in size: CGSize) -> some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                let x = value.location.x / size.width
+                if x > 0.6 {
+                    let nextPage = min(linkService.currentPageIndex + 2, max(viewModel.pageCount - 1, 0))
+                    linkService.sendPageChange(to: normalizedSpreadBase(nextPage))
+                } else if x < 0.4 {
+                    let previousPage = max(linkService.currentPageIndex - 2, 0)
+                    linkService.sendPageChange(to: normalizedSpreadBase(previousPage))
+                } else {
                     withAnimation(.easeOut(duration: 0.2)) {
                         showingControls.toggle()
                     }
@@ -381,14 +461,14 @@ public struct ScoreReaderView: View {
         }
     }
 
-    private func updatePlaybackProgress() {
-        guard playbackEngine.totalDuration > 0 else { return }
-        // Progress within current page
-        let totalMeasures = playbackEngine.measureCount
-        guard totalMeasures > 0, viewModel.pageCount > 0 else { return }
-        let measuresPerPage = Double(totalMeasures) / Double(viewModel.pageCount)
-        let measureInPage = Double(playbackEngine.currentMeasure) - Double(viewModel.currentPageIndex) * measuresPerPage
-        playbackProgress = min(1.0, max(0.0, measureInPage / measuresPerPage))
+    private func updatePlaybackProgress(currentTime: TimeInterval, totalDuration: TimeInterval) {
+        guard totalDuration > 0, viewModel.pageCount > 0 else { return }
+        // Calculate progress within the current page
+        // Each page covers an equal fraction of total duration
+        let durationPerPage = totalDuration / Double(viewModel.pageCount)
+        let pageStartTime = Double(viewModel.currentPageIndex) * durationPerPage
+        let timeInPage = currentTime - pageStartTime
+        playbackProgress = min(1.0, max(0.0, timeInPage / durationPerPage))
     }
 
     // MARK: - Floating Controls Overlay
@@ -421,6 +501,18 @@ public struct ScoreReaderView: View {
                     .lineLimit(1)
 
                 Spacer()
+
+                if isLinkedSessionActive {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(ASColors.success)
+                            .frame(width: 6, height: 6)
+                        Text(linkedModeLabel)
+                            .font(ASTypography.monoMicro)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.trailing, ASSpacing.sm)
+                }
 
                 Text("\(viewModel.currentPageIndex + 1) / \(viewModel.pageCount)")
                     .font(ASTypography.monoSmall)
@@ -485,6 +577,12 @@ public struct ScoreReaderView: View {
                 // Bookmarks
                 controlButton(icon: "bookmark", label: "Bookmark") {}
 
+                controlDivider
+
+                controlButton(icon: isLinkedSessionActive ? "dot.radiowaves.left.and.right" : "ipad.and.iphone", label: "Link") {
+                    showingDeviceLinkSheet = true
+                }
+
                 // Performance lock
                 controlButton(icon: "lock.shield", label: "Lock") {
                     viewModel.isPerformanceMode.toggle()
@@ -511,46 +609,45 @@ public struct ScoreReaderView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: ASSpacing.sm) {
-                // Close / panel controls row
-                HStack {
-                    // Mixer toggle
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showingMixer.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "slider.vertical.3")
-                                .font(.system(size: 13, weight: .medium))
-                            Text("Mixer")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundStyle(showingMixer ? ASColors.accentFallback : .secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    // Rehearsal marks toggle
-                    if let map = measureMap, !map.rehearsalEntries.isEmpty {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showingRehearsalMarks.toggle()
+            VStack(spacing: ASSpacing.xs) {
+                // Row 1: Inline part mute/solo chips + panel toggles + close
+                HStack(spacing: ASSpacing.sm) {
+                    // Quick part chips (inline mute/solo)
+                    if let score = normalizedScore {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(Array(score.parts.enumerated()), id: \.offset) { index, part in
+                                    partChip(name: part.abbreviation.isEmpty ? part.name : part.abbreviation, index: index)
+                                }
                             }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "signpost.right")
-                                    .font(.system(size: 13, weight: .medium))
-                                Text("Marks")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .foregroundStyle(showingRehearsalMarks ? ASColors.accentFallback : .secondary)
                         }
-                        .buttonStyle(.plain)
                     }
 
                     Spacer()
 
-                    // Close playback panel
+                    // Mixer (full panel)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showingMixer.toggle() }
+                    } label: {
+                        Image(systemName: "slider.vertical.3")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(showingMixer ? ASColors.accentFallback : .secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Rehearsal marks
+                    if let map = measureMap, !map.rehearsalEntries.isEmpty {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { showingRehearsalMarks.toggle() }
+                        } label: {
+                            Image(systemName: "signpost.right")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(showingRehearsalMarks ? ASColors.accentFallback : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Close
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             playbackEngine.stop()
@@ -560,18 +657,160 @@ public struct ScoreReaderView: View {
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18))
+                            .font(.system(size: 16))
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, ASSpacing.lg)
 
-                // Transport controls
+                // Row 2: Bar indicator + progress + time
+                HStack(spacing: ASSpacing.sm) {
+                    // Tappable bar indicator — jump to bar
+                    Button {
+                        barJumpText = "\(playbackEngine.currentMeasure)"
+                        showingBarJump = true
+                    } label: {
+                        HStack(spacing: 2) {
+                            Image(systemName: "number")
+                                .font(.system(size: 10, weight: .medium))
+                            Text("Bar \(playbackEngine.currentMeasure)/\(playbackEngine.measureCount)")
+                                .font(ASTypography.monoSmall)
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(ASColors.chromeSurfaceElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showingBarJump) {
+                        barJumpPopover
+                    }
+
+                    Text(formatTime(playbackEngine.currentTime))
+                        .font(ASTypography.monoMicro)
+                        .foregroundStyle(.secondary)
+
+                    // Progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 4)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(ASColors.accentFallback)
+                                .frame(width: geo.size.width * (playbackEngine.totalDuration > 0 ? playbackEngine.currentTime / playbackEngine.totalDuration : 0), height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+
+                    Text(formatTime(playbackEngine.totalDuration))
+                        .font(ASTypography.monoMicro)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, ASSpacing.lg)
+
+                // Row 3: Transport controls
                 PlaybackControlsView(engine: playbackEngine)
             }
+            .padding(.vertical, ASSpacing.sm)
             .padding(.bottom, ASSpacing.screenPadding)
         }
+    }
+
+    // MARK: - Part Chip (inline mute/solo)
+
+    private func partChip(name: String, index: Int) -> some View {
+        let isMuted = playbackEngine.mutedParts.contains(index)
+        let isSoloed = playbackEngine.soloPart == index
+
+        let bgColor: Color = isSoloed ? ASColors.accentFallback.opacity(0.2) :
+            isMuted ? Color.gray.opacity(0.15) : ASColors.chromeSurfaceElevated
+        let fgColor: Color = isSoloed ? ASColors.accentFallback :
+            isMuted ? Color.gray.opacity(0.4) : Color(white: 0.9)
+        let borderColor: Color = isSoloed ? ASColors.accentFallback.opacity(0.5) :
+            isMuted ? Color.clear : Color.gray.opacity(0.2)
+
+        return Menu {
+            Button {
+                if isMuted {
+                    playbackEngine.mutedParts.remove(index)
+                } else {
+                    playbackEngine.mutedParts.insert(index)
+                }
+            } label: {
+                Label(isMuted ? "Unmute" : "Mute", systemImage: isMuted ? "speaker.wave.2" : "speaker.slash")
+            }
+            Button {
+                if isSoloed {
+                    playbackEngine.soloPart = nil
+                } else {
+                    playbackEngine.soloPart = index
+                }
+            } label: {
+                Label(isSoloed ? "Unsolo" : "Solo", systemImage: "headphones")
+            }
+        } label: {
+            Text(name)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(bgColor)
+                .foregroundStyle(fgColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                        .strokeBorder(borderColor, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Bar Jump Popover
+
+    private var barJumpPopover: some View {
+        VStack(spacing: ASSpacing.md) {
+            Text("Jump to Bar")
+                .font(ASTypography.labelSmall)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                TextField("Bar", text: $barJumpText)
+                    .font(ASTypography.mono)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+
+                Text("/ \(playbackEngine.measureCount)")
+                    .font(ASTypography.monoSmall)
+                    .foregroundStyle(.tertiary)
+            }
+
+            HStack(spacing: ASSpacing.md) {
+                Button("Cancel") {
+                    showingBarJump = false
+                }
+                .foregroundStyle(.secondary)
+                .buttonStyle(.plain)
+
+                Button("Go") {
+                    if let bar = Int(barJumpText), bar >= 1, bar <= playbackEngine.measureCount {
+                        playbackEngine.seek(toMeasure: bar)
+                        autoPageTurn(forMeasure: bar)
+                    }
+                    showingBarJump = false
+                }
+                .foregroundStyle(ASColors.accentFallback)
+                .buttonStyle(.plain)
+                .font(.system(size: 14, weight: .semibold))
+            }
+        }
+        .padding()
+        .frame(minWidth: 200)
     }
 
     // MARK: - Mixer Panel
@@ -795,6 +1034,63 @@ public struct ScoreReaderView: View {
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous))
         }
+    }
+
+    private var linkedModeLabel: String {
+        switch linkService.displayMode {
+        case .twoPageSpread:
+            return linkService.localRole == .secondary ? "Linked Right Page" : "Linked Left Page"
+        case .mirroredSync:
+            return "Mirrored"
+        case .conductorPerformer:
+            return linkService.localRole == .conductor ? "Conductor" : "Performer"
+        }
+    }
+
+    private func configureDeviceLink() {
+        linkService.startSession()
+        linkService.onMessageReceived = { message in
+            switch message {
+            case .scoreOpened(let scoreID):
+                if scoreID != viewModel.score.id {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showingControls = true
+                    }
+                }
+            case .pageChanged(let pageIndex):
+                syncToLinkedPage(pageIndex)
+            default:
+                break
+            }
+        }
+
+        if linkService.isLinked {
+            linkService.sendOpenedScore(viewModel.score.id, pageIndex: normalizedSpreadBase(viewModel.currentPageIndex))
+        }
+    }
+
+    private func syncToLinkedPage(_ pageIndex: Int) {
+        guard isLinkedSessionActive else { return }
+        let target = linkService.displayMode == .twoPageSpread ? normalizedSpreadBase(pageIndex) : pageIndex
+        guard target != viewModel.currentPageIndex else { return }
+
+        suppressLinkedBroadcast = true
+        Task {
+            await viewModel.goToPage(target)
+            await MainActor.run {
+                suppressLinkedBroadcast = false
+            }
+        }
+    }
+
+    private func normalizedSpreadBase(_ pageIndex: Int) -> Int {
+        max(0, pageIndex - (pageIndex % 2))
+    }
+
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 
     // MARK: - Controls Timer

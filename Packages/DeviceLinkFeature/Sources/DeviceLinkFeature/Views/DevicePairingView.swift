@@ -33,6 +33,7 @@ public struct DevicePairingView: View {
             // Connected devices
             if !linkService.connectedPeers.isEmpty {
                 connectedSection
+                modeSection
             }
 
             // Discovered devices
@@ -100,6 +101,42 @@ public struct DevicePairingView: View {
                 .padding(ASSpacing.sm)
                 .background(.quaternary.opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
+            }
+        }
+    }
+
+    private var modeSection: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.sm) {
+            Text("Linked Mode")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                modeButton(
+                    title: "Two-screen spread",
+                    subtitle: "Use both devices as a single two-page score.",
+                    active: linkService.displayMode == .twoPageSpread
+                ) {
+                    linkService.configureSpreadRoles()
+                }
+
+                modeButton(
+                    title: "Mirrored sync",
+                    subtitle: "Both devices stay on the same page.",
+                    active: linkService.displayMode == .mirroredSync
+                ) {
+                    linkService.localRole = .primary
+                    linkService.displayMode = .mirroredSync
+                    linkService.sendMessage(.displayModeChanged(mode: LinkedDisplayMode.mirroredSync.rawValue))
+                }
+
+                modeButton(
+                    title: "Conductor / performer",
+                    subtitle: "Leader advances pages while the paired device follows.",
+                    active: linkService.displayMode == .conductorPerformer
+                ) {
+                    linkService.configureConductorMode()
+                }
             }
         }
     }
@@ -174,5 +211,31 @@ public struct DevicePairingView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private func modeButton(title: String, subtitle: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: ASSpacing.sm) {
+                Image(systemName: active ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(active ? ASColors.accentFallback : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer()
+            }
+            .padding(ASSpacing.sm)
+            .background(active ? ASColors.accentFallback.opacity(0.08) : Color.secondary.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
