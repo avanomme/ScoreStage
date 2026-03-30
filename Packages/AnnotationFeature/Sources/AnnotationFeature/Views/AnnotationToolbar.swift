@@ -98,6 +98,8 @@ public final class AnnotationState {
 
     public var snapshots: [SnapshotInfo] = []
     public var showingSnapshotManager = false
+    /// Callback fired when the host should persist a new snapshot.
+    public var onCreateSnapshot: ((String) -> Void)?
     /// Callback for restoring a snapshot — set by the hosting view controller.
     public var onRestoreSnapshot: ((UUID) -> Void)?
 
@@ -195,16 +197,20 @@ public final class AnnotationState {
         let layer = LayerInfo(name: name, type: type, sortOrder: nextOrder)
         layers.append(layer)
         activeLayerID = layer.id
+        isDirty = true
     }
 
     public func removeLayer(_ id: UUID) {
         // Cannot remove the default layer
         guard let layer = layers.first(where: { $0.id == id }), layer.type != .default else { return }
         layers.removeAll(where: { $0.id == id })
+        allStrokes.removeAll(where: { $0.layerID == id })
         // If we removed the active layer, fall back to default
         if activeLayerID == id {
             activeLayerID = layers.first(where: { $0.type == .default })?.id ?? layers.first?.id
         }
+        canUndo = !allStrokes.isEmpty
+        isDirty = true
     }
 
     public func setActiveLayer(_ id: UUID) {
@@ -215,11 +221,13 @@ public final class AnnotationState {
     public func toggleLayerVisibility(_ id: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
         layers[index].isVisible.toggle()
+        isDirty = true
     }
 
     public func renameLayer(_ id: UUID, to name: String) {
         guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
         layers[index].name = name
+        isDirty = true
     }
 
     // MARK: - Snapshot Operations
@@ -227,6 +235,7 @@ public final class AnnotationState {
     public func createSnapshot(name: String) {
         let snapshot = SnapshotInfo(name: name)
         snapshots.insert(snapshot, at: 0) // newest first
+        onCreateSnapshot?(name)
     }
 
     public func removeSnapshot(_ id: UUID) {
@@ -247,7 +256,6 @@ public struct AnnotationToolbarView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Main tool strip
             HStack(spacing: ASSpacing.xs) {
                 ForEach(AnnotationTool.allCases) { tool in
                     toolButton(tool)
@@ -300,6 +308,24 @@ public struct AnnotationToolbarView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Stamps & Symbols")
+
+                divider
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        state.showingSnapshotManager.toggle()
+                        state.showingLayerManager = false
+                        state.showingStampPicker = false
+                        showingColorPicker = false
+                        showingWidthSlider = false
+                    }
+                } label: {
+                    Image(systemName: "camera.macro")
+                        .font(.system(size: 14, weight: state.showingSnapshotManager ? .semibold : .medium))
+                        .foregroundStyle(state.showingSnapshotManager ? ASColors.accentFallback : .primary)
+                }
+                .buttonStyle(.plain)
+                .help("Snapshots")
 
                 divider
 
@@ -358,9 +384,18 @@ public struct AnnotationToolbarView: View {
                         state.saveAndExit()
                     }
                 } label: {
-                    Text("Done")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ASColors.accentFallback)
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                        Text("Done")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ASColors.accentFallback)
+                    .padding(.horizontal, ASSpacing.sm)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(ASColors.accentFallback.opacity(0.12))
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -379,8 +414,21 @@ public struct AnnotationToolbarView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(.ultraThinMaterial)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.08),
+                    ASColors.chromeSurfaceElevated.opacity(0.95)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.8)
+        )
         .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
     }
 
@@ -396,7 +444,7 @@ public struct AnnotationToolbarView: View {
                 .background(
                     state.selectedTool == tool
                         ? AnyShapeStyle(ASColors.accentFallback.opacity(0.15))
-                        : AnyShapeStyle(Color.clear)
+                        : AnyShapeStyle(Color.white.opacity(0.03))
                 )
                 .clipShape(RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous))
         }
@@ -453,7 +501,7 @@ public struct AnnotationToolbarView: View {
 
     private var divider: some View {
         Rectangle()
-            .fill(.quaternary)
+            .fill(Color.white.opacity(0.08))
             .frame(width: 1, height: 24)
     }
 }

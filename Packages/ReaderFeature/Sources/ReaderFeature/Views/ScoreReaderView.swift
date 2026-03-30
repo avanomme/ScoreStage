@@ -33,6 +33,8 @@ public struct ScoreReaderView: View {
     @State private var linkService = DeviceLinkService()
     @State private var showingDeviceLinkSheet = false
     @State private var suppressLinkedBroadcast = false
+    @State private var showingBookmarksPanel = false
+    @State private var showingLinkSessionPanel = false
 
     // Setlist navigation
     let setlistItems: [SetListItem]?
@@ -134,6 +136,19 @@ public struct ScoreReaderView: View {
                         .padding(.bottom, 100)
                     }
                 }
+
+                if annotationState.showingSnapshotManager {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            SnapshotManagerView(state: annotationState)
+                                .frame(width: 240)
+                        }
+                        .padding(.trailing, ASSpacing.lg)
+                        .padding(.bottom, 100)
+                    }
+                }
             }
 
             // Floating controls overlay (reader mode only)
@@ -146,6 +161,34 @@ public struct ScoreReaderView: View {
             if showingPlayback && !annotationState.isAnnotating {
                 playbackPanel
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if showingBookmarksPanel && !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        bookmarksPanel
+                            .frame(width: 320)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                    .padding(.trailing, ASSpacing.lg)
+                    .padding(.bottom, showingPlayback ? 110 : ASSpacing.screenPadding)
+                }
+            }
+
+            if showingLinkSessionPanel && !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    HStack {
+                        linkSessionPanel
+                            .frame(width: 320)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        Spacer()
+                    }
+                    .padding(.leading, ASSpacing.lg)
+                    .padding(.bottom, showingPlayback ? 110 : ASSpacing.screenPadding)
+                }
             }
 
             // Mixer panel — floating on the left
@@ -198,6 +241,7 @@ public struct ScoreReaderView: View {
         }
         .task {
             await viewModel.loadDocument(from: fileURL)
+            await restoreReaderSession()
             viewModel.markAsOpened()
             loadAnnotations()
             setupAnnotationCallbacks()
@@ -207,16 +251,27 @@ public struct ScoreReaderView: View {
         .onDisappear {
             // Auto-save annotations when leaving
             saveAnnotations()
+            persistReaderPreferences()
+            saveReaderSession()
             playbackEngine.stop()
             playbackEngine.shutdown()
             linkService.disconnect()
         }
         .onChange(of: viewModel.currentPageIndex) { _, newValue in
+            saveReaderSession()
             guard canBroadcastPageChanges else { return }
             let pageToSend = linkService.displayMode == .twoPageSpread
                 ? max(0, newValue - (newValue % 2))
                 : newValue
             linkService.sendPageChange(to: pageToSend)
+        }
+        .onChange(of: viewModel.displayMode) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
+        }
+        .onChange(of: viewModel.paperTheme) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
         }
         .onChange(of: linkService.currentPageIndex) { _, newValue in
             syncToLinkedPage(newValue)
@@ -475,58 +530,52 @@ public struct ScoreReaderView: View {
 
     private var floatingControlsOverlay: some View {
         VStack {
-            // Top bar
-            HStack {
-                Button {
-                    playbackEngine.stop()
-                    playbackEngine.shutdown()
-                    if let onClose {
-                        onClose()
-                    } else {
-                        dismiss()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .medium))
-                        Text("Library")
-                            .font(.system(size: 14, weight: .regular))
-                    }
-                    .foregroundStyle(.primary)
-                }
-                .buttonStyle(.plain)
+            HStack(alignment: .center, spacing: ASSpacing.md) {
+                closeReaderButton
 
-                Text(viewModel.score.title)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.score.title)
+                        .font(ASTypography.heading3)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    HStack(spacing: ASSpacing.xs) {
+                        readerMetaBadge(icon: "doc.text", text: pageProgressLabel)
+
+                        if isLinkedSessionActive {
+                            readerMetaBadge(icon: "dot.radiowaves.left.and.right", text: linkedModeLabel, accent: ASColors.success)
+                        }
+
+                        if playbackEngine.state == .playing {
+                            readerMetaBadge(icon: "waveform", text: "Playback", accent: ASColors.accentFallback)
+                        }
+                    }
+                }
 
                 Spacer()
 
-                if isLinkedSessionActive {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(ASColors.success)
-                            .frame(width: 6, height: 6)
-                        Text(linkedModeLabel)
-                            .font(ASTypography.monoMicro)
-                            .foregroundStyle(.secondary)
+                HStack(spacing: ASSpacing.sm) {
+                    topUtilityButton(icon: isCurrentPageBookmarked ? "bookmark.fill" : "bookmark") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingBookmarksPanel.toggle()
+                        }
                     }
-                    .padding(.trailing, ASSpacing.sm)
+                    topUtilityButton(icon: isLinkedSessionActive ? "dot.radiowaves.left.and.right" : "ipad.and.iphone") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingLinkSessionPanel.toggle()
+                        }
+                    }
                 }
-
-                Text("\(viewModel.currentPageIndex + 1) / \(viewModel.pageCount)")
-                    .font(ASTypography.monoSmall)
-                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, ASSpacing.lg)
-            .frame(height: 44)
-            .background(.regularMaterial)
+            .padding(.vertical, ASSpacing.md)
+            .background(readerHUDPanel)
+            .padding(.horizontal, ASSpacing.lg)
+            .padding(.top, ASSpacing.md)
 
             Spacer()
 
-            // Bottom floating control bar
             HStack(spacing: ASSpacing.cardGap) {
-                // Display mode
                 Menu {
                     Picker("Display", selection: $viewModel.displayMode) {
                         Label("Single Page", systemImage: "doc").tag(DisplayMode.singlePage)
@@ -535,36 +584,33 @@ public struct ScoreReaderView: View {
                         Label("Two Page", systemImage: "book.pages").tag(DisplayMode.twoPageSpread)
                     }
                 } label: {
-                    controlIcon(icon: "rectangle.split.2x1", label: "Display")
+                    controlIcon(icon: "rectangle.split.2x1", label: displayModeLabel, isActive: false)
                 }
 
                 controlDivider
 
-                // Paper theme
                 Menu {
                     Picker("Paper", selection: $viewModel.paperTheme) {
                         Text("White").tag(PaperTheme.light)
                         Text("Cream").tag(PaperTheme.sepia)
                     }
                 } label: {
-                    controlIcon(icon: "doc.plaintext", label: "Paper")
+                    controlIcon(icon: "doc.plaintext", label: paperThemeLabel, isActive: false)
                 }
 
                 controlDivider
 
-                // Annotate
-                controlButton(icon: "pencil.tip.crop.circle", label: "Annotate") {
+                controlButton(icon: "pencil.tip.crop.circle", label: "Annotate", isActive: annotationState.isAnnotating) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         annotationState.isAnnotating = true
                         showingControls = false
                     }
                 }
 
-                // Playback (only if MusicXML data available)
                 if hasPlaybackData {
                     controlDivider
 
-                    controlButton(icon: "play.circle", label: "Play") {
+                    controlButton(icon: "play.circle", label: "Play", isActive: showingPlayback) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showingPlayback = true
                             showingControls = false
@@ -574,30 +620,26 @@ public struct ScoreReaderView: View {
 
                 controlDivider
 
-                // Bookmarks
-                controlButton(icon: "bookmark", label: "Bookmark") {}
+                controlButton(icon: isCurrentPageBookmarked ? "bookmark.fill" : "bookmark", label: "Bookmark", isActive: isCurrentPageBookmarked) {
+                    toggleCurrentPageBookmark()
+                }
 
                 controlDivider
 
-                controlButton(icon: isLinkedSessionActive ? "dot.radiowaves.left.and.right" : "ipad.and.iphone", label: "Link") {
-                    showingDeviceLinkSheet = true
+                controlButton(icon: isLinkedSessionActive ? "dot.radiowaves.left.and.right" : "ipad.and.iphone", label: "Link", isActive: isLinkedSessionActive) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingLinkSessionPanel.toggle()
+                    }
                 }
 
-                // Performance lock
-                controlButton(icon: "lock.shield", label: "Lock") {
+                controlButton(icon: "lock.shield", label: "Lock", isActive: viewModel.isPerformanceMode) {
                     viewModel.isPerformanceMode.toggle()
                 }
             }
             .padding(.horizontal, ASSpacing.xl)
             .padding(.vertical, ASSpacing.md)
             .frame(minWidth: 320, maxWidth: 560)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+            .background(readerHUDPanel)
             .padding(.horizontal, ASSpacing.xl)
             .padding(.bottom, ASSpacing.screenPadding)
         }
@@ -609,10 +651,8 @@ public struct ScoreReaderView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: ASSpacing.xs) {
-                // Row 1: Inline part mute/solo chips + panel toggles + close
+            VStack(spacing: ASSpacing.sm) {
                 HStack(spacing: ASSpacing.sm) {
-                    // Quick part chips (inline mute/solo)
                     if let score = normalizedScore {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
@@ -625,7 +665,6 @@ public struct ScoreReaderView: View {
 
                     Spacer()
 
-                    // Mixer (full panel)
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) { showingMixer.toggle() }
                     } label: {
@@ -635,7 +674,6 @@ public struct ScoreReaderView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Rehearsal marks
                     if let map = measureMap, !map.rehearsalEntries.isEmpty {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { showingRehearsalMarks.toggle() }
@@ -647,7 +685,6 @@ public struct ScoreReaderView: View {
                         .buttonStyle(.plain)
                     }
 
-                    // Close
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             playbackEngine.stop()
@@ -664,9 +701,19 @@ public struct ScoreReaderView: View {
                 }
                 .padding(.horizontal, ASSpacing.lg)
 
-                // Row 2: Bar indicator + progress + time
+                HStack(spacing: ASSpacing.md) {
+                    Text("Playback Studio")
+                        .font(ASTypography.heading3)
+                        .foregroundStyle(.primary)
+
+                    Spacer()
+
+                    readerMetaBadge(icon: "metronome", text: "\(Int(playbackEngine.tempo)) BPM", accent: ASColors.accentFallback)
+                    readerMetaBadge(icon: "music.note", text: "m. \(playbackEngine.currentMeasure)", accent: ASColors.info)
+                }
+                .padding(.horizontal, ASSpacing.lg)
+
                 HStack(spacing: ASSpacing.sm) {
-                    // Tappable bar indicator — jump to bar
                     Button {
                         barJumpText = "\(playbackEngine.currentMeasure)"
                         showingBarJump = true
@@ -711,10 +758,11 @@ public struct ScoreReaderView: View {
                 }
                 .padding(.horizontal, ASSpacing.lg)
 
-                // Row 3: Transport controls
                 PlaybackControlsView(engine: playbackEngine)
             }
-            .padding(.vertical, ASSpacing.sm)
+            .padding(.vertical, ASSpacing.md)
+            .background(readerHUDPanel)
+            .padding(.horizontal, ASSpacing.lg)
             .padding(.bottom, ASSpacing.screenPadding)
         }
     }
@@ -848,22 +896,26 @@ public struct ScoreReaderView: View {
             .frame(width: 0.5, height: 28)
     }
 
-    private func controlButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+    private func controlButton(icon: String, label: String, isActive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            controlIcon(icon: icon, label: label)
+            controlIcon(icon: icon, label: label, isActive: isActive)
         }
         .buttonStyle(.plain)
     }
 
-    private func controlIcon(icon: String, label: String) -> some View {
+    private func controlIcon(icon: String, label: String, isActive: Bool) -> some View {
         VStack(spacing: 3) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .regular))
             Text(label)
                 .font(.system(size: 9, weight: .medium))
         }
-        .foregroundStyle(.primary)
-        .frame(minWidth: 44, minHeight: 44)
+        .foregroundStyle(isActive ? ASColors.accentFallback : .primary)
+        .frame(minWidth: 54, minHeight: 48)
+        .background(
+            RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                .fill(isActive ? ASColors.accentFallback.opacity(0.12) : Color.clear)
+        )
     }
 
     // MARK: - Page Number Overlay
@@ -891,6 +943,12 @@ public struct ScoreReaderView: View {
         annotationState.onClearPage = { [self] in
             annotationState.clearPage(viewModel.currentPageIndex)
         }
+        annotationState.onCreateSnapshot = { [self] name in
+            createAnnotationSnapshot(named: name)
+        }
+        annotationState.onRestoreSnapshot = { [self] id in
+            restoreAnnotationSnapshot(id: id)
+        }
     }
 
     private func loadAnnotations() {
@@ -908,10 +966,13 @@ public struct ScoreReaderView: View {
         }
 
         // Update annotation state layers
-        annotationState.layers = score.annotationLayers.map { layer in
+        annotationState.layers = score.annotationLayers
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { layer in
             LayerInfo(id: layer.id, name: layer.name, type: layer.type, isVisible: layer.isVisible, sortOrder: layer.sortOrder)
         }
         annotationState.activeLayerID = defaultLayer.id
+        refreshAnnotationSnapshots()
 
         // Load strokes from all layers
         var loaded: [CanvasStroke] = []
@@ -929,6 +990,8 @@ public struct ScoreReaderView: View {
     private func saveAnnotations() {
         guard annotationState.isDirty else { return }
         let score = viewModel.score
+
+        syncPersistentLayers(for: score)
 
         // Find default layer
         guard let defaultLayer = score.annotationLayers.first(where: { $0.type == .default }) else { return }
@@ -950,6 +1013,129 @@ public struct ScoreReaderView: View {
 
         try? modelContext.save()
         annotationState.isDirty = false
+    }
+
+    private func syncPersistentLayers(for score: Score) {
+        let stateLayers = annotationState.layers.sorted { $0.sortOrder < $1.sortOrder }
+        let stateIDs = Set(stateLayers.map(\.id))
+
+        for info in stateLayers {
+            if let existing = score.annotationLayers.first(where: { $0.id == info.id }) {
+                existing.name = info.name
+                existing.type = info.type
+                existing.isVisible = info.isVisible
+                existing.sortOrder = info.sortOrder
+                existing.modifiedAt = Date()
+            } else {
+                let layer = AnnotationLayer(name: info.name, type: info.type, sortOrder: info.sortOrder)
+                layer.id = info.id
+                layer.isVisible = info.isVisible
+                layer.score = score
+                modelContext.insert(layer)
+            }
+        }
+
+        for layer in score.annotationLayers where !stateIDs.contains(layer.id) && layer.type != .default {
+            modelContext.delete(layer)
+        }
+
+        if !annotationState.layers.contains(where: { $0.type == .default }) {
+            let defaultLayer = AnnotationLayer(name: "Default", type: .default, sortOrder: 0)
+            defaultLayer.score = score
+            modelContext.insert(defaultLayer)
+            annotationState.layers.insert(
+                LayerInfo(id: defaultLayer.id, name: defaultLayer.name, type: defaultLayer.type, isVisible: defaultLayer.isVisible, sortOrder: defaultLayer.sortOrder),
+                at: 0
+            )
+            annotationState.activeLayerID = defaultLayer.id
+        }
+    }
+
+    private func refreshAnnotationSnapshots() {
+        annotationState.snapshots = viewModel.score.annotationSnapshots
+            .sorted { $0.createdAt > $1.createdAt }
+            .map { SnapshotInfo(id: $0.id, name: $0.name, createdAt: $0.createdAt) }
+    }
+
+    private func createAnnotationSnapshot(named name: String) {
+        let payload = AnnotationSnapshotPayload(
+            layers: annotationState.layers
+                .sorted { $0.sortOrder < $1.sortOrder }
+                .map { layer in
+                    AnnotationSnapshotPayload.LayerPayload(
+                        id: layer.id,
+                        name: layer.name,
+                        type: layer.type.rawValue,
+                        isVisible: layer.isVisible,
+                        sortOrder: layer.sortOrder,
+                        strokes: annotationState.allStrokes
+                            .filter { $0.layerID == layer.id }
+                            .map { stroke in
+                                AnnotationSnapshotPayload.StrokePayload(
+                                    id: stroke.id,
+                                    tool: "pen",
+                                    colorHex: stroke.color.hexString,
+                                    lineWidth: stroke.lineWidth,
+                                    opacity: stroke.opacity,
+                                    pageIndex: stroke.pageIndex,
+                                    pointsData: (try? JSONEncoder().encode(stroke.points)) ?? Data()
+                                )
+                            },
+                        objects: []
+                    )
+                }
+        )
+
+        guard let data = try? JSONEncoder().encode(payload) else { return }
+        let snapshot = AnnotationSnapshot(name: name, snapshotData: data)
+        snapshot.score = viewModel.score
+        modelContext.insert(snapshot)
+        try? modelContext.save()
+        refreshAnnotationSnapshots()
+    }
+
+    private func restoreAnnotationSnapshot(id: UUID) {
+        guard let snapshot = viewModel.score.annotationSnapshots.first(where: { $0.id == id }),
+              let payload = try? JSONDecoder().decode(AnnotationSnapshotPayload.self, from: snapshot.snapshotData) else {
+            return
+        }
+
+        var restoredLayers = payload.layers
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map {
+                LayerInfo(
+                    id: $0.id,
+                    name: $0.name,
+                    type: AnnotationLayerType(rawValue: $0.type) ?? .custom,
+                    isVisible: $0.isVisible,
+                    sortOrder: $0.sortOrder
+                )
+            }
+
+        if !restoredLayers.contains(where: { $0.type == .default }) {
+            restoredLayers.insert(LayerInfo(name: "Default", type: .default, sortOrder: 0), at: 0)
+        }
+
+        annotationState.layers = restoredLayers
+        annotationState.activeLayerID = restoredLayers.first(where: { $0.type == .default })?.id ?? restoredLayers.first?.id
+        annotationState.allStrokes = payload.layers.flatMap { layer in
+            layer.strokes.compactMap { strokePayload in
+                guard let points = try? JSONDecoder().decode([CGPoint].self, from: strokePayload.pointsData) else { return nil }
+                return CanvasStroke(
+                    id: strokePayload.id,
+                    points: points,
+                    layerID: layer.id,
+                    color: Color(hex: strokePayload.colorHex),
+                    lineWidth: strokePayload.lineWidth,
+                    opacity: strokePayload.opacity,
+                    pageIndex: strokePayload.pageIndex
+                )
+            }
+        }
+        annotationState.canUndo = !annotationState.allStrokes.isEmpty
+        annotationState.canRedo = false
+        annotationState.isDirty = true
+        saveAnnotations()
     }
 
     // MARK: - Stroke Conversion
@@ -1047,6 +1233,370 @@ public struct ScoreReaderView: View {
         }
     }
 
+    private var sortedBookmarks: [Bookmark] {
+        viewModel.score.bookmarks.sorted { lhs, rhs in
+            if lhs.pageIndex == rhs.pageIndex {
+                return lhs.sortOrder < rhs.sortOrder
+            }
+            return lhs.pageIndex < rhs.pageIndex
+        }
+    }
+
+    private var currentPageBookmark: Bookmark? {
+        sortedBookmarks.first(where: { $0.pageIndex == viewModel.currentPageIndex })
+    }
+
+    private var isCurrentPageBookmarked: Bool {
+        currentPageBookmark != nil
+    }
+
+    private var pageProgressLabel: String {
+        "\(viewModel.currentPageIndex + 1) / \(viewModel.pageCount)"
+    }
+
+    private var displayModeLabel: String {
+        switch viewModel.displayMode {
+        case .singlePage: "Single"
+        case .horizontalPaged: "Paged"
+        case .verticalScroll: "Scroll"
+        case .twoPageSpread: "Spread"
+        }
+    }
+
+    private var paperThemeLabel: String {
+        switch viewModel.paperTheme {
+        case .light: "White"
+        case .sepia: "Cream"
+        case .warm: "Warm"
+        case .highContrast: "Sharp"
+        case .dark: "White"
+        }
+    }
+
+    private var readerHUDPanel: some View {
+        RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.48),
+                        ASColors.chromeSurface.opacity(0.92)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.8)
+            )
+            .shadow(color: .black.opacity(0.22), radius: 18, y: 10)
+    }
+
+    private var closeReaderButton: some View {
+        Button {
+            playbackEngine.stop()
+            playbackEngine.shutdown()
+            if let onClose {
+                onClose()
+            } else {
+                dismiss()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Library")
+                    .font(ASTypography.label)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, ASSpacing.md)
+            .padding(.vertical, ASSpacing.sm)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.06))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func topUtilityButton(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
+                .background(
+                    RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func readerMetaBadge(icon: String, text: String, accent: Color? = nil) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(ASTypography.monoMicro)
+        .foregroundStyle(accent ?? ASColors.textSecondaryDark)
+        .padding(.horizontal, ASSpacing.sm)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+
+    private var bookmarksPanel: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack {
+                Text("Bookmarks")
+                    .font(ASTypography.heading3)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingBookmarksPanel = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: ASSpacing.sm) {
+                Button(isCurrentPageBookmarked ? "Remove Current" : "Save Current") {
+                    toggleCurrentPageBookmark()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(isCurrentPageBookmarked ? ASColors.error : ASColors.accentFallback)
+
+                Spacer()
+
+                Text("Page \(viewModel.currentPageIndex + 1)")
+                    .font(ASTypography.monoMicro)
+                    .foregroundStyle(.secondary)
+            }
+
+            if sortedBookmarks.isEmpty {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text("No bookmarks yet")
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+                    Text("Save important turns, repeats, and rehearsal entry points for fast recall.")
+                        .font(ASTypography.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, ASSpacing.sm)
+            } else {
+                ScrollView {
+                    VStack(spacing: ASSpacing.xs) {
+                        ForEach(sortedBookmarks) { bookmark in
+                            HStack(spacing: ASSpacing.sm) {
+                                Circle()
+                                    .fill(Color(hex: bookmark.colorHex) ?? ASColors.accentFallback)
+                                    .frame(width: 8, height: 8)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(bookmark.name)
+                                        .font(ASTypography.label)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    Text("Page \(bookmark.pageIndex + 1)")
+                                        .font(ASTypography.monoMicro)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                if bookmark.pageIndex == viewModel.currentPageIndex {
+                                    Text("Live")
+                                        .font(ASTypography.monoMicro)
+                                        .foregroundStyle(ASColors.accentFallback)
+                                }
+
+                                Button("Go") {
+                                    Task { await viewModel.goToPage(bookmark.pageIndex) }
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        showingBookmarksPanel = false
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(ASColors.accentFallback)
+
+                                Button {
+                                    removeBookmark(bookmark)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, ASSpacing.sm)
+                            .padding(.vertical, ASSpacing.sm)
+                            .background(
+                                RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                                    .fill(Color.white.opacity(0.04))
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 260)
+            }
+        }
+        .padding(ASSpacing.lg)
+        .background(readerHUDPanel)
+    }
+
+    private var linkSessionPanel: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack {
+                Text("Linked Session")
+                    .font(ASTypography.heading3)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingLinkSessionPanel = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                readerMetaBadge(icon: "dot.radiowaves.left.and.right", text: linkService.connectionSummary, accent: isLinkedSessionActive ? ASColors.success : ASColors.warning)
+                Text("Switch roles and layouts without leaving the reader.")
+                    .font(ASTypography.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Two-Device Spread")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: ASSpacing.sm) {
+                    linkModeButton(
+                        title: "Lead",
+                        subtitle: "Left page",
+                        isActive: linkService.displayMode == .twoPageSpread && linkService.localRole == .primary
+                    ) {
+                        linkService.configureLinkedSession(displayMode: .twoPageSpread, localRole: .primary, remoteRole: .secondary)
+                    }
+
+                    linkModeButton(
+                        title: "Follow",
+                        subtitle: "Right page",
+                        isActive: linkService.displayMode == .twoPageSpread && linkService.localRole == .secondary
+                    ) {
+                        linkService.configureLinkedSession(displayMode: .twoPageSpread, localRole: .secondary, remoteRole: .primary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Mirrored")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: ASSpacing.sm) {
+                    linkModeButton(
+                        title: "Leader",
+                        subtitle: "Turns pages",
+                        isActive: linkService.displayMode == .mirroredSync && linkService.localRole == .primary
+                    ) {
+                        linkService.configureLinkedSession(displayMode: .mirroredSync, localRole: .primary, remoteRole: .secondary)
+                    }
+
+                    linkModeButton(
+                        title: "Follower",
+                        subtitle: "Stays synced",
+                        isActive: linkService.displayMode == .mirroredSync && linkService.localRole == .secondary
+                    ) {
+                        linkService.configureLinkedSession(displayMode: .mirroredSync, localRole: .secondary, remoteRole: .primary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Conductor Session")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: ASSpacing.sm) {
+                    linkModeButton(
+                        title: "Conductor",
+                        subtitle: "Leads ensemble",
+                        isActive: linkService.displayMode == .conductorPerformer && linkService.localRole == .conductor
+                    ) {
+                        linkService.configureLinkedSession(displayMode: .conductorPerformer, localRole: .conductor, remoteRole: .performer)
+                    }
+
+                    linkModeButton(
+                        title: "Performer",
+                        subtitle: "Follows cueing",
+                        isActive: linkService.displayMode == .conductorPerformer && linkService.localRole == .performer
+                    ) {
+                        linkService.configureLinkedSession(displayMode: .conductorPerformer, localRole: .performer, remoteRole: .conductor)
+                    }
+                }
+            }
+
+            HStack(spacing: ASSpacing.sm) {
+                Button("Pair Devices") {
+                    showingDeviceLinkSheet = true
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ASColors.accentFallback)
+
+                Spacer()
+
+                if isLinkedSessionActive {
+                    Button("End Session") {
+                        linkService.disconnect()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ASColors.error)
+                }
+            }
+        }
+        .padding(ASSpacing.lg)
+        .background(readerHUDPanel)
+    }
+
+    private func linkModeButton(title: String, subtitle: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(ASTypography.label)
+                    .foregroundStyle(isActive ? ASColors.accentFallback : .primary)
+                Text(subtitle)
+                    .font(ASTypography.captionSmall)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, ASSpacing.sm)
+            .padding(.vertical, ASSpacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                    .fill(isActive ? ASColors.accentFallback.opacity(0.14) : Color.white.opacity(0.04))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func configureDeviceLink() {
         linkService.startSession()
         linkService.onMessageReceived = { message in
@@ -1093,6 +1643,63 @@ public struct ScoreReaderView: View {
         return String(format: "%d:%02d", mins, secs)
     }
 
+    private func toggleCurrentPageBookmark() {
+        if let bookmark = currentPageBookmark {
+            removeBookmark(bookmark)
+            return
+        }
+
+        let bookmark = Bookmark(
+            name: "Page \(viewModel.currentPageIndex + 1)",
+            pageIndex: viewModel.currentPageIndex,
+            sortOrder: sortedBookmarks.count
+        )
+        bookmark.score = viewModel.score
+        modelContext.insert(bookmark)
+        try? modelContext.save()
+    }
+
+    private func removeBookmark(_ bookmark: Bookmark) {
+        modelContext.delete(bookmark)
+        try? modelContext.save()
+    }
+
+    private func persistReaderPreferences() {
+        viewModel.updateViewingPreferences()
+        try? modelContext.save()
+    }
+
+    private func saveReaderSession() {
+        let session = ReaderSessionState(
+            pageIndex: viewModel.currentPageIndex,
+            displayMode: viewModel.displayMode,
+            paperTheme: viewModel.paperTheme,
+            zoomScale: viewModel.zoomScale,
+            savedAt: Date()
+        )
+
+        guard let data = try? JSONEncoder().encode(session) else { return }
+        UserDefaults.standard.set(data, forKey: readerSessionStorageKey)
+    }
+
+    private func restoreReaderSession() async {
+        guard let data = UserDefaults.standard.data(forKey: readerSessionStorageKey),
+              let session = try? JSONDecoder().decode(ReaderSessionState.self, from: data) else {
+            return
+        }
+
+        viewModel.displayMode = session.displayMode
+        viewModel.paperTheme = session.paperTheme
+        viewModel.zoomScale = session.zoomScale
+
+        guard viewModel.pageCount > 0 else { return }
+        await viewModel.goToPage(min(session.pageIndex, viewModel.pageCount - 1))
+    }
+
+    private var readerSessionStorageKey: String {
+        "reader-session-\(viewModel.score.id.uuidString)"
+    }
+
     // MARK: - Controls Timer
 
     private func scheduleControlsHide() {
@@ -1104,4 +1711,12 @@ public struct ScoreReaderView: View {
             }
         }
     }
+}
+
+private struct ReaderSessionState: Codable {
+    let pageIndex: Int
+    let displayMode: DisplayMode
+    let paperTheme: PaperTheme
+    let zoomScale: Double
+    let savedAt: Date
 }

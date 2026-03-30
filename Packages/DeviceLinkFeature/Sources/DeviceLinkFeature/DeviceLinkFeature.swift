@@ -220,6 +220,17 @@ public final class DeviceLinkService: NSObject {
         sendMessage(.pageChanged(pageIndex: pageIndex))
     }
 
+    public func configureLinkedSession(
+        displayMode: LinkedDisplayMode,
+        localRole: DeviceRole,
+        remoteRole: DeviceRole
+    ) {
+        self.displayMode = displayMode
+        self.localRole = localRole
+        sendMessage(.displayModeChanged(mode: displayMode.rawValue))
+        sendMessage(.roleAssignment(role: remoteRole.rawValue))
+    }
+
     public var isLinked: Bool {
         !connectedPeers.isEmpty
     }

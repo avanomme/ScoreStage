@@ -17,11 +17,16 @@ public struct PlaybackControlsView: View {
 
     public var body: some View {
         HStack(spacing: ASSpacing.lg) {
-            // Measure indicator
-            Text("m. \(engine.currentMeasure)")
-                .font(ASTypography.monoSmall)
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 50)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Now")
+                    .font(ASTypography.labelMicro)
+                    .tracking(0.8)
+                    .foregroundStyle(ASColors.textTertiaryDark)
+                Text("m. \(engine.currentMeasure)")
+                    .font(ASTypography.monoSmall)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 56, alignment: .leading)
 
             Divider().frame(height: 28)
 
@@ -40,7 +45,16 @@ public struct PlaybackControlsView: View {
         }
         .padding(.horizontal, ASSpacing.xl)
         .padding(.vertical, ASSpacing.md)
-        .background(.regularMaterial)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.05),
+                    ASColors.chromeSurfaceElevated.opacity(0.92)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .clipShape(RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: ASRadius.sheet, style: .continuous)
@@ -181,6 +195,10 @@ public struct PlaybackControlsView: View {
             }
             .foregroundStyle(isActive ? ASColors.accentFallback : .secondary)
             .frame(minWidth: 36, minHeight: 36)
+            .background(
+                RoundedRectangle(cornerRadius: ASRadius.sm, style: .continuous)
+                    .fill(isActive ? ASColors.accentFallback.opacity(0.12) : Color.clear)
+            )
         }
         .buttonStyle(.plain)
     }
