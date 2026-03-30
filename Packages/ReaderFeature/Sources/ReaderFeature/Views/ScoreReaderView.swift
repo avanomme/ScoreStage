@@ -7,6 +7,24 @@ import PlaybackFeature
 import NotationFeature
 import DeviceLinkFeature
 
+private struct SetlistAdvanceCountdown: Equatable {
+    let title: String
+    let message: String
+    var remainingSeconds: Int
+    let destinationIndex: Int
+}
+
+private extension DisplayMode {
+    var setlistLabel: String {
+        switch self {
+        case .singlePage: return "Single"
+        case .verticalScroll: return "Scroll"
+        case .horizontalPaged: return "Horizontal"
+        case .twoPageSpread: return "Spread"
+        }
+    }
+}
+
 /// Reader Environment — sacred full-screen score display.
 /// No persistent toolbars. Controls appear as floating translucent overlay on interaction.
 public struct ScoreReaderView: View {
@@ -44,6 +62,8 @@ public struct ScoreReaderView: View {
     let currentSetlistIndex: Int?
     let onNavigateSetlist: ((Int) -> Void)?
     @State private var showingSetlistNav = false
+    @State private var setlistAdvanceTask: Task<Void, Never>?
+    @State private var activeSetlistCountdown: SetlistAdvanceCountdown?
 
     public init(
         score: Score,
@@ -223,6 +243,20 @@ public struct ScoreReaderView: View {
                 }
             }
 
+            if showingSetlistNav && !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    HStack {
+                        setlistSessionPanel
+                            .frame(width: 360)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        Spacer()
+                    }
+                    .padding(.leading, ASSpacing.lg)
+                    .padding(.bottom, showingPlayback ? 110 : ASSpacing.screenPadding)
+                }
+            }
+
             // Mixer panel — floating on the left
             if showingMixer {
                 VStack {
@@ -270,10 +304,36 @@ public struct ScoreReaderView: View {
                     .padding(.bottom, showingPlayback ? 80 : ASSpacing.md)
                 }
             }
+
+            if let countdown = activeSetlistCountdown, !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    VStack(spacing: ASSpacing.sm) {
+                        Text(countdown.title)
+                            .font(ASTypography.heading2)
+                        Text(countdown.message)
+                            .font(ASTypography.bodySmall)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Text("\(countdown.remainingSeconds)")
+                            .font(ASTypography.displayMedium)
+                            .monospacedDigit()
+                        Button("Skip Wait") {
+                            completeSetlistAdvance(to: countdown.destinationIndex)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(ASSpacing.xl)
+                    .background(readerHUDPanel)
+                    .padding(.bottom, showingPlayback ? 160 : 120)
+                }
+                .transition(.opacity.combined(with: .scale))
+            }
         }
         .task {
             await viewModel.loadDocument(from: fileURL)
             await restoreReaderSession()
+            await applyCurrentSetlistPreset()
             viewModel.markAsOpened()
             loadAnnotations()
             setupAnnotationCallbacks()
@@ -287,6 +347,7 @@ public struct ScoreReaderView: View {
             saveReaderSession()
             playbackEngine.stop()
             playbackEngine.shutdown()
+            setlistAdvanceTask?.cancel()
             linkService.disconnect()
         }
         .onChange(of: viewModel.currentPageIndex) { _, newValue in
@@ -332,6 +393,17 @@ public struct ScoreReaderView: View {
             if newValue > 0 {
                 linkService.sendOpenedScore(viewModel.score.id, pageIndex: normalizedSpreadBase(viewModel.currentPageIndex))
             }
+        }
+        .onChange(of: currentSetlistIndex) { _, _ in
+            setlistAdvanceTask?.cancel()
+            activeSetlistCountdown = nil
+            Task {
+                await applyCurrentSetlistPreset()
+            }
+        }
+        .onChange(of: playbackEngine.state) { oldValue, newValue in
+            guard oldValue == .playing, newValue == .stopped else { return }
+            scheduleAutoAdvanceIfNeeded()
         }
         .sheet(isPresented: $showingDeviceLinkSheet) {
             DevicePairingView(linkService: linkService)
@@ -642,6 +714,13 @@ public struct ScoreReaderView: View {
                 Spacer()
 
                 HStack(spacing: ASSpacing.sm) {
+                    if setlistItems != nil {
+                        topUtilityButton(icon: "music.note.list") {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showingSetlistNav.toggle()
+                            }
+                        }
+                    }
                     topUtilityButton(icon: "list.bullet.rectangle.portrait") {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showingQuickJumpPanel.toggle()
@@ -682,6 +761,16 @@ public struct ScoreReaderView: View {
                     }
                 } label: {
                     controlIcon(icon: "rectangle.split.2x1", label: displayModeLabel, isActive: false)
+                }
+
+                if setlistItems != nil {
+                    controlDivider
+
+                    controlButton(icon: "music.note.list", label: "Set", isActive: showingSetlistNav) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingSetlistNav.toggle()
+                        }
+                    }
                 }
 
                 controlDivider
@@ -1368,10 +1457,31 @@ public struct ScoreReaderView: View {
 
     // MARK: - Setlist Navigation
 
+    private var currentSetlistItem: SetListItem? {
+        guard let items = setlistItems, let currentSetlistIndex, items.indices.contains(currentSetlistIndex) else {
+            return nil
+        }
+        return items[currentSetlistIndex]
+    }
+
+    private var hasActiveSetlistPreset: Bool {
+        currentSetlistItem?.performancePreset != nil
+    }
+
     @ViewBuilder
     private var setlistNavigationBar: some View {
         if let items = setlistItems, let currentIdx = currentSetlistIndex {
             HStack(spacing: ASSpacing.md) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingSetlistNav.toggle()
+                    }
+                } label: {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.plain)
+
                 // Previous song
                 Button {
                     if currentIdx > 0 { onNavigateSetlist?(currentIdx - 1) }
@@ -1415,12 +1525,249 @@ public struct ScoreReaderView: View {
                 }
                 .disabled(currentIdx >= items.count - 1)
                 .buttonStyle(.plain)
+
+                if currentSetlistItem != nil {
+                    Button {
+                        triggerCurrentSetlistTransition()
+                    } label: {
+                        Image(systemName: transitionButtonIcon)
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(currentIdx >= items.count - 1)
+                }
             }
             .padding(.horizontal, ASSpacing.md)
             .padding(.vertical, ASSpacing.sm)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous))
         }
+    }
+
+    @ViewBuilder
+    private var setlistSessionPanel: some View {
+        if let item = currentSetlistItem, let currentIdx = currentSetlistIndex {
+            VStack(alignment: .leading, spacing: ASSpacing.lg) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                        Text("Live Set")
+                            .font(ASTypography.heading2)
+                        Text("\(currentIdx + 1) of \(setlistItems?.count ?? 0)")
+                            .font(ASTypography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingSetlistNav = false
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text(item.score?.title ?? viewModel.score.title)
+                        .font(ASTypography.heading3)
+                    if !item.medleyTitle.isEmpty {
+                        Label("Medley: \(item.medleyTitle)", systemImage: "link")
+                            .font(ASTypography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let preset = item.performancePreset {
+                        HStack(spacing: ASSpacing.sm) {
+                            readerMetaBadge(icon: "bookmark", text: "Page \(preset.startPageIndex + 1)")
+                            if let displayMode = preset.preferredDisplayMode {
+                                readerMetaBadge(icon: "rectangle.split.2x1", text: displayMode.setlistLabel)
+                            }
+                            if preset.requiresLinkedMode {
+                                readerMetaBadge(icon: "ipad.and.iphone", text: "Linked", accent: ASColors.success)
+                            }
+                        }
+                    }
+                }
+
+                if !item.cueTitle.isEmpty || !item.cueNotes.isEmpty {
+                    sessionInfoBlock(title: item.cueTitle.isEmpty ? "Cue" : item.cueTitle, body: item.cueNotes)
+                }
+
+                if !item.performanceNotes.isEmpty {
+                    sessionInfoBlock(title: "Performance Notes", body: item.performanceNotes)
+                }
+
+                if let setNotes = currentSetlistItem?.setList?.performanceNotes, !setNotes.isEmpty {
+                    sessionInfoBlock(title: "Set Notes", body: setNotes)
+                }
+
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    Text("Transition")
+                        .font(ASTypography.labelSmall)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: ASSpacing.sm) {
+                        readerMetaBadge(icon: transitionButtonIcon, text: currentTransitionLabel)
+                        if item.transitionStyle == .timedPause, !item.pauseNotes.isEmpty {
+                            readerMetaBadge(icon: "text.bubble", text: item.pauseNotes)
+                        }
+                    }
+                }
+
+                HStack(spacing: ASSpacing.sm) {
+                    Button("Previous") {
+                        if currentIdx > 0 {
+                            onNavigateSetlist?(currentIdx - 1)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(currentIdx == 0)
+
+                    Button(currentIdx >= (setlistItems?.count ?? 1) - 1 ? "Last Song" : "Advance") {
+                        triggerCurrentSetlistTransition()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(currentIdx >= (setlistItems?.count ?? 1) - 1)
+                }
+            }
+            .padding(ASSpacing.cardPadding)
+            .background(readerHUDPanel)
+        }
+    }
+
+    private func sessionInfoBlock(title: String, body: String) -> some View {
+        VStack(alignment: .leading, spacing: ASSpacing.xs) {
+            Text(title)
+                .font(ASTypography.labelSmall)
+                .foregroundStyle(.secondary)
+            Text(body)
+                .font(ASTypography.bodySmall)
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(ASSpacing.md)
+        .background(ASColors.chromeSurface.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous))
+    }
+
+    private var transitionButtonIcon: String {
+        guard let item = currentSetlistItem else { return "forward.end.fill" }
+        switch item.transitionStyle {
+        case .manual:
+            return "forward.end.fill"
+        case .segue:
+            return "forward.frame.fill"
+        case .timedPause:
+            return "timer"
+        case .autoAdvance:
+            return "play.circle.fill"
+        }
+    }
+
+    private var currentTransitionLabel: String {
+        guard let item = currentSetlistItem else { return "Manual" }
+        switch item.transitionStyle {
+        case .manual:
+            return "Manual advance"
+        case .segue:
+            return item.medleyTitle.isEmpty ? "Segue to next song" : "Segue in \(item.medleyTitle)"
+        case .timedPause:
+            return "\(Int(item.pauseDuration)) second pause"
+        case .autoAdvance:
+            return "\(Int(item.autoAdvanceDelay)) second auto-advance"
+        }
+    }
+
+    private func applyCurrentSetlistPreset() async {
+        guard let item = currentSetlistItem, let preset = item.performancePreset else { return }
+
+        if let displayMode = preset.preferredDisplayMode {
+            viewModel.displayMode = displayMode
+        }
+        if let paperTheme = preset.preferredPaperTheme {
+            viewModel.paperTheme = paperTheme
+        }
+        if let pageTurnBehavior = preset.preferredPageTurnBehavior {
+            viewModel.pageTurnBehavior = pageTurnBehavior
+        }
+        viewModel.isPerformanceMode = preset.opensInPerformanceMode
+
+        guard viewModel.pageCount > 0 else { return }
+        await viewModel.goToPage(min(preset.startPageIndex, viewModel.pageCount - 1))
+    }
+
+    private func triggerCurrentSetlistTransition() {
+        guard let items = setlistItems,
+              let currentIdx = currentSetlistIndex,
+              currentIdx < items.count - 1 else { return }
+
+        let nextIndex = currentIdx + 1
+        let item = items[currentIdx]
+        switch item.transitionStyle {
+        case .manual, .segue:
+            completeSetlistAdvance(to: nextIndex)
+        case .timedPause:
+            startSetlistCountdown(
+                title: item.medleyTitle.isEmpty ? "Pause" : item.medleyTitle,
+                message: item.pauseNotes.isEmpty ? "Advancing to the next chart after the programmed pause." : item.pauseNotes,
+                seconds: max(1, Int(item.pauseDuration)),
+                destinationIndex: nextIndex
+            )
+        case .autoAdvance:
+            startSetlistCountdown(
+                title: "Auto Advance",
+                message: "The next chart will open automatically.",
+                seconds: max(1, Int(item.autoAdvanceDelay)),
+                destinationIndex: nextIndex
+            )
+        }
+    }
+
+    private func scheduleAutoAdvanceIfNeeded() {
+        guard let item = currentSetlistItem, item.transitionStyle == .autoAdvance else { return }
+        guard let currentIdx = currentSetlistIndex,
+              let items = setlistItems,
+              currentIdx < items.count - 1 else { return }
+        startSetlistCountdown(
+            title: "Auto Advance",
+            message: "Playback ended. Opening the next chart automatically.",
+            seconds: max(1, Int(item.autoAdvanceDelay)),
+            destinationIndex: currentIdx + 1
+        )
+    }
+
+    private func startSetlistCountdown(title: String, message: String, seconds: Int, destinationIndex: Int) {
+        setlistAdvanceTask?.cancel()
+        activeSetlistCountdown = SetlistAdvanceCountdown(
+            title: title,
+            message: message,
+            remainingSeconds: seconds,
+            destinationIndex: destinationIndex
+        )
+
+        setlistAdvanceTask = Task {
+            var remaining = seconds
+            while remaining > 0 && !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                remaining -= 1
+                if Task.isCancelled { return }
+                await MainActor.run {
+                    activeSetlistCountdown?.remainingSeconds = remaining
+                }
+            }
+            if !Task.isCancelled {
+                await MainActor.run {
+                    completeSetlistAdvance(to: destinationIndex)
+                }
+            }
+        }
+    }
+
+    private func completeSetlistAdvance(to destinationIndex: Int) {
+        setlistAdvanceTask?.cancel()
+        activeSetlistCountdown = nil
+        onNavigateSetlist?(destinationIndex)
     }
 
     private var linkedModeLabel: String {
@@ -2315,6 +2662,7 @@ public struct ScoreReaderView: View {
     }
 
     private func persistReaderPreferences() {
+        guard !hasActiveSetlistPreset else { return }
         viewModel.updateViewingPreferences()
         try? modelContext.save()
     }

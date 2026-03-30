@@ -74,13 +74,25 @@ public struct SetlistListView: View {
     }
 
     private func duplicateSetlist(_ original: SetList) {
-        let copy = SetList(name: "\(original.name) (Copy)", eventDescription: original.eventDescription)
+        let copy = SetList(
+            name: "\(original.name) (Copy)",
+            eventDescription: original.eventDescription,
+            performanceNotes: original.performanceNotes,
+            stageNotes: original.stageNotes
+        )
         modelContext.insert(copy)
         for item in original.items.sorted(by: { $0.sortOrder < $1.sortOrder }) {
             let newItem = SetListItem(
                 sortOrder: item.sortOrder,
                 performanceNotes: item.performanceNotes,
-                pauseDuration: item.pauseDuration
+                cueTitle: item.cueTitle,
+                cueNotes: item.cueNotes,
+                pauseDuration: item.pauseDuration,
+                pauseNotes: item.pauseNotes,
+                transitionStyle: item.transitionStyle,
+                medleyTitle: item.medleyTitle,
+                autoAdvanceDelay: item.autoAdvanceDelay,
+                performancePreset: item.performancePreset
             )
             newItem.setList = copy
             newItem.score = item.score
@@ -101,6 +113,12 @@ struct SetlistRow: View {
                 Text("\(setlist.items.count) scores")
                     .font(ASTypography.caption)
                     .foregroundStyle(.secondary)
+
+                if !setlist.performanceNotes.isEmpty || !setlist.stageNotes.isEmpty {
+                    Label("Show Notes", systemImage: "music.note.list")
+                        .font(ASTypography.captionSmall)
+                        .foregroundStyle(.tertiary)
+                }
 
                 if let date = setlist.eventDate {
                     Text(date, style: .date)

@@ -143,3 +143,24 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - Start Sprint 3 from the parity matrix
 - Focus on full setlist and live show workflow completeness before moving to library power-user features
+
+---
+
+## 2026-03-30 — Sprint 3 Complete: Setlists / Live Show Tools
+
+**What changed:**
+- Expanded setlist data to carry show-level notes, cueing, transition behavior, medley grouping, auto-advance timing, and per-item reader presets
+- Rebuilt the setlist detail workflow into a true performance editor with running-order controls, quick start, item editing, and richer live metadata per song
+- Added item-level editing for cues, pause behavior, auto-advance timing, medley labels, and per-song reader presets such as start page, display mode, paper theme, and page-turn behavior
+- Upgraded the reader’s setlist session support so live sets can surface cues, set notes, medley context, transition behavior, and countdown-based pauses/auto-advance directly in performance view
+- Prevented set-specific reader presets from overwriting the score’s normal saved reading preferences
+
+**Verification:**
+- `swift build` in `Packages/CoreDomain`
+- `swift build` in `Packages/SetlistFeature`
+- `swift build` in `Packages/ReaderFeature`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Start Sprint 4 from the parity matrix
+- Focus on library scale, import robustness, metadata power tools, and scan cleanup quality

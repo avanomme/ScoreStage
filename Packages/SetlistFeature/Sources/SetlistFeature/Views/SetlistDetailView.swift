@@ -6,8 +6,10 @@ import DesignSystem
 public struct SetlistDetailView: View {
     @Bindable var setlist: SetList
     @Environment(\.modelContext) private var modelContext
-    @State private var showingAddScores = false
     @Query private var allScores: [Score]
+    @State private var showingAddScores = false
+    @State private var editingItem: SetListItem?
+
     private let onOpenScore: ((Score, [SetListItem], Int) -> Void)?
 
     public init(setlist: SetList, onOpenScore: ((Score, [SetListItem], Int) -> Void)? = nil) {
@@ -19,73 +21,28 @@ public struct SetlistDetailView: View {
         setlist.items.sorted { $0.sortOrder < $1.sortOrder }
     }
 
-    private func sortSetlistItems(by comparator: (SetListItem, SetListItem) -> Bool) {
-        let sorted = setlist.items.sorted(by: comparator)
-        for (index, item) in sorted.enumerated() {
-            item.sortOrder = index
-        }
-        setlist.modifiedAt = Date()
+    private var estimatedScoreDuration: TimeInterval {
+        sortedItems.reduce(0) { $0 + ($1.score?.duration ?? 0) }
     }
 
-    private func reverseSetlistItems() {
-        let items = sortedItems.reversed()
-        for (index, item) in items.enumerated() {
-            item.sortOrder = index
-        }
-        setlist.modifiedAt = Date()
+    private var totalPauseDuration: TimeInterval {
+        sortedItems.reduce(0) { $0 + $1.pauseDuration + $1.autoAdvanceDelay }
     }
 
-    private func shuffleSetlistItems() {
-        let items = sortedItems.shuffled()
-        for (index, item) in items.enumerated() {
-            item.sortOrder = index
-        }
-        setlist.modifiedAt = Date()
+    private var medleyCount: Int {
+        Set(sortedItems.map(\.medleyTitle).filter { !$0.isEmpty }).count
     }
 
     public var body: some View {
-        List {
-            Section {
-                TextField("Description", text: $setlist.eventDescription, axis: .vertical)
-                DatePicker("Event Date", selection: Binding(
-                    get: { setlist.eventDate ?? Date() },
-                    set: { setlist.eventDate = $0 }
-                ), displayedComponents: .date)
+        ScrollView {
+            VStack(alignment: .leading, spacing: ASSpacing.xl) {
+                heroCard
+                showNotesCard
+                runningOrderCard
             }
-
-            Section("Scores") {
-                if sortedItems.isEmpty {
-                    Text("No scores added yet")
-                        .foregroundStyle(.secondary)
-                        .font(ASTypography.body)
-                } else {
-                    ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
-                        SetlistItemRow(item: item, index: index + 1)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if let score = item.score {
-                                    onOpenScore?(score, sortedItems, index)
-                                }
-                            }
-                    }
-                    .onDelete { indexSet in
-                        let items = sortedItems
-                        for index in indexSet {
-                            modelContext.delete(items[index])
-                        }
-                    }
-                    .onMove { source, destination in
-                        var items = sortedItems
-                        items.move(fromOffsets: source, toOffset: destination)
-                        for (index, item) in items.enumerated() {
-                            item.sortOrder = index
-                        }
-                    }
-                }
-            }
+            .padding(ASSpacing.screenPadding)
         }
-        .scrollContentBackground(.hidden)
-        .background(ASColors.chromeBackground)
+        .background(ASColors.chromeBackground.ignoresSafeArea())
         .navigationTitle(setlist.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -95,112 +52,643 @@ public struct SetlistDetailView: View {
                     Label("Add Scores", systemImage: "plus")
                 }
             }
-            ToolbarItem {
-                Menu {
-                    Section("Sort Scores") {
-                        Button {
-                            sortSetlistItems { ($0.score?.title ?? "").localizedCaseInsensitiveCompare($1.score?.title ?? "") == .orderedAscending }
-                        } label: {
-                            Label("By Title (A–Z)", systemImage: "textformat.abc")
-                        }
-                        Button {
-                            sortSetlistItems { ($0.score?.title ?? "").localizedCaseInsensitiveCompare($1.score?.title ?? "") == .orderedDescending }
-                        } label: {
-                            Label("By Title (Z–A)", systemImage: "textformat.abc")
-                        }
-                        Button {
-                            sortSetlistItems { ($0.score?.composer ?? "").localizedCaseInsensitiveCompare($1.score?.composer ?? "") == .orderedAscending }
-                        } label: {
-                            Label("By Composer", systemImage: "person")
-                        }
-                        Button {
-                            sortSetlistItems { ($0.score?.genre ?? "").localizedCaseInsensitiveCompare($1.score?.genre ?? "") == .orderedAscending }
-                        } label: {
-                            Label("By Genre", systemImage: "guitars")
-                        }
-                        Button {
-                            sortSetlistItems { ($0.score?.difficulty ?? 0) < ($1.score?.difficulty ?? 0) }
-                        } label: {
-                            Label("By Difficulty", systemImage: "chart.bar")
-                        }
-                        Button {
-                            sortSetlistItems { ($0.score?.duration ?? 0) < ($1.score?.duration ?? 0) }
-                        } label: {
-                            Label("By Duration", systemImage: "clock")
-                        }
-                    }
-                    Section {
-                        Button {
-                            reverseSetlistItems()
-                        } label: {
-                            Label("Reverse Order", systemImage: "arrow.up.arrow.down")
-                        }
-                        Button {
-                            shuffleSetlistItems()
-                        } label: {
-                            Label("Shuffle", systemImage: "shuffle")
-                        }
-                    }
-                } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
-                }
-            }
-            #if os(iOS)
-            ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-            }
-            #endif
         }
         .sheet(isPresented: $showingAddScores) {
             AddScoresToSetlistView(setlist: setlist, allScores: allScores)
         }
+        .sheet(item: $editingItem) { item in
+            SetlistItemEditorView(item: item)
+        }
+    }
+
+    private var heroCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: ASSpacing.lg) {
+                HStack(alignment: .top, spacing: ASSpacing.lg) {
+                    VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                        TextField("Setlist Name", text: $setlist.name)
+                            .font(ASTypography.displaySmall)
+                            .textFieldStyle(.plain)
+
+                        TextField("Event Description", text: $setlist.eventDescription, axis: .vertical)
+                            .font(ASTypography.body)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2...4)
+
+                        HStack(spacing: ASSpacing.sm) {
+                            Label(eventDateLabel, systemImage: "calendar")
+                                .font(ASTypography.caption)
+                                .foregroundStyle(.secondary)
+
+                            if medleyCount > 0 {
+                                Label("\(medleyCount) medleys", systemImage: "link")
+                                    .font(ASTypography.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: ASSpacing.sm) {
+                        Button {
+                            openSet(at: 0)
+                        } label: {
+                            Label("Start Set", systemImage: "play.fill")
+                                .font(ASTypography.label)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(sortedItems.isEmpty)
+
+                        Menu {
+                            Button("Sort by Title") {
+                                sortSetlistItems { ($0.score?.title ?? "").localizedCaseInsensitiveCompare($1.score?.title ?? "") == .orderedAscending }
+                            }
+                            Button("Sort by Composer") {
+                                sortSetlistItems { ($0.score?.composer ?? "").localizedCaseInsensitiveCompare($1.score?.composer ?? "") == .orderedAscending }
+                            }
+                            Button("Sort by Duration") {
+                                sortSetlistItems { ($0.score?.duration ?? 0) < ($1.score?.duration ?? 0) }
+                            }
+                            Button("Reverse Order") {
+                                reverseSetlistItems()
+                            }
+                            Button("Shuffle") {
+                                shuffleSetlistItems()
+                            }
+                        } label: {
+                            Label("Arrange", systemImage: "arrow.up.arrow.down.square")
+                                .font(ASTypography.labelSmall)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+
+                HStack(spacing: ASSpacing.md) {
+                    SetlistMetricCard(title: "Songs", value: "\(sortedItems.count)", detail: "ready")
+                    SetlistMetricCard(title: "Music", value: durationLabel(estimatedScoreDuration), detail: "score time")
+                    SetlistMetricCard(title: "Transitions", value: durationLabel(totalPauseDuration), detail: "pauses + auto")
+                }
+
+                HStack(spacing: ASSpacing.md) {
+                    DatePicker(
+                        "Event Date",
+                        selection: Binding(
+                            get: { setlist.eventDate ?? Date() },
+                            set: {
+                                setlist.eventDate = $0
+                                touchSetlist()
+                            }
+                        ),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+
+                    Button("Use Today") {
+                        setlist.eventDate = Date()
+                        touchSetlist()
+                    }
+                    .buttonStyle(.bordered)
+
+                    if setlist.eventDate != nil {
+                        Button("Clear Date", role: .destructive) {
+                            setlist.eventDate = nil
+                            touchSetlist()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    private var showNotesCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: ASSpacing.lg) {
+                Text("Show Notes")
+                    .font(ASTypography.heading2)
+
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    Text("Performance Notes")
+                        .font(ASTypography.labelSmall)
+                        .foregroundStyle(.secondary)
+                    TextField("Shared notes for the whole set", text: $setlist.performanceNotes, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                        .lineLimit(3...6)
+                }
+
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    Text("Stage / Crew Notes")
+                        .font(ASTypography.labelSmall)
+                        .foregroundStyle(.secondary)
+                    TextField("Lighting, patching, entrances, reminders", text: $setlist.stageNotes, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                        .lineLimit(3...6)
+                }
+            }
+        }
+    }
+
+    private var runningOrderCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: ASSpacing.lg) {
+                HStack {
+                    VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                        Text("Running Order")
+                            .font(ASTypography.heading2)
+                        Text("Each item carries its own cues, transition behavior, and reader preset.")
+                            .font(ASTypography.bodySmall)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingAddScores = true
+                    } label: {
+                        Label("Add Scores", systemImage: "plus.circle.fill")
+                            .font(ASTypography.label)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if sortedItems.isEmpty {
+                    EmptyStateView(
+                        icon: "music.note.list",
+                        title: "No Songs Yet",
+                        message: "Add scores, then shape transitions and cues for the live run.",
+                        actionTitle: "Add Scores"
+                    ) {
+                        showingAddScores = true
+                    }
+                } else {
+                    VStack(spacing: ASSpacing.md) {
+                        ForEach(Array(sortedItems.enumerated()), id: \.element.id) { index, item in
+                            SetlistPerformanceRow(
+                                item: item,
+                                index: index,
+                                canMoveUp: index > 0,
+                                canMoveDown: index < sortedItems.count - 1,
+                                onOpen: {
+                                    openSet(at: index)
+                                },
+                                onEdit: {
+                                    editingItem = item
+                                },
+                                onMoveUp: {
+                                    moveItem(item, direction: .up)
+                                },
+                                onMoveDown: {
+                                    moveItem(item, direction: .down)
+                                },
+                                onDelete: {
+                                    deleteItem(item)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var eventDateLabel: String {
+        guard let eventDate = setlist.eventDate else { return "Unscheduled" }
+        return eventDate.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    private func openSet(at index: Int) {
+        guard index >= 0, index < sortedItems.count, let score = sortedItems[index].score else { return }
+        touchSetlist()
+        onOpenScore?(score, sortedItems, index)
+    }
+
+    private func deleteItem(_ item: SetListItem) {
+        modelContext.delete(item)
+        normalizeSortOrder()
+    }
+
+    private func moveItem(_ item: SetListItem, direction: SetlistMoveDirection) {
+        guard let index = sortedItems.firstIndex(where: { $0.id == item.id }) else { return }
+        let destination: Int
+        switch direction {
+        case .up:
+            destination = max(0, index - 1)
+        case .down:
+            destination = min(sortedItems.count - 1, index + 1)
+        }
+        guard destination != index else { return }
+
+        var items = sortedItems
+        let moved = items.remove(at: index)
+        items.insert(moved, at: destination)
+        for (position, existing) in items.enumerated() {
+            existing.sortOrder = position
+        }
+        touchSetlist()
+    }
+
+    private func sortSetlistItems(by comparator: (SetListItem, SetListItem) -> Bool) {
+        let sorted = setlist.items.sorted(by: comparator)
+        for (index, item) in sorted.enumerated() {
+            item.sortOrder = index
+        }
+        touchSetlist()
+    }
+
+    private func reverseSetlistItems() {
+        for (index, item) in sortedItems.reversed().enumerated() {
+            item.sortOrder = index
+        }
+        touchSetlist()
+    }
+
+    private func shuffleSetlistItems() {
+        for (index, item) in sortedItems.shuffled().enumerated() {
+            item.sortOrder = index
+        }
+        touchSetlist()
+    }
+
+    private func normalizeSortOrder() {
+        for (index, item) in sortedItems.enumerated() {
+            item.sortOrder = index
+        }
+        touchSetlist()
+    }
+
+    private func touchSetlist() {
+        setlist.modifiedAt = Date()
+    }
+
+    private func durationLabel(_ duration: TimeInterval) -> String {
+        let totalSeconds = Int(duration)
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 
-struct SetlistItemRow: View {
-    let item: SetListItem
-    let index: Int
+private enum SetlistMoveDirection {
+    case up
+    case down
+}
+
+private struct SetlistMetricCard: View {
+    let title: String
+    let value: String
+    let detail: String
 
     var body: some View {
-        HStack(spacing: ASSpacing.md) {
-            // Track number
-            Text("\(index)")
-                .font(ASTypography.monoSmall)
+        VStack(alignment: .leading, spacing: ASSpacing.xs) {
+            Text(title.uppercased())
+                .font(ASTypography.labelMicro)
                 .foregroundStyle(.tertiary)
-                .frame(width: 24)
+            Text(value)
+                .font(ASTypography.heading1)
+            Text(detail)
+                .font(ASTypography.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(ASSpacing.md)
+        .background(ASColors.chromeSurface.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
+    }
+}
 
-            VStack(alignment: .leading, spacing: ASSpacing.xxs) {
-                Text(item.score?.title ?? "Unknown Score")
-                    .font(ASTypography.body)
+private struct SetlistPerformanceRow: View {
+    let item: SetListItem
+    let index: Int
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    let onOpen: () -> Void
+    let onEdit: () -> Void
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onDelete: () -> Void
 
-                HStack(spacing: ASSpacing.sm) {
+    var body: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack(alignment: .top, spacing: ASSpacing.md) {
+                Text("\(index + 1)")
+                    .font(ASTypography.mono)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text(item.score?.title ?? "Unknown Score")
+                        .font(ASTypography.heading3)
+
                     if let composer = item.score?.composer, !composer.isEmpty {
                         Text(composer)
                             .font(ASTypography.caption)
                             .foregroundStyle(.secondary)
                     }
-
-                    if !item.performanceNotes.isEmpty {
-                        Text(item.performanceNotes)
-                            .font(ASTypography.captionSmall)
-                            .foregroundStyle(.tertiary)
-                    }
                 }
 
-                if item.pauseDuration > 0 {
-                    Label("\(Int(item.pauseDuration))s pause", systemImage: "timer")
-                        .font(ASTypography.captionSmall)
-                        .foregroundStyle(.tertiary)
+                Spacer()
+
+                HStack(spacing: ASSpacing.sm) {
+                    Button(action: onMoveUp) {
+                        Image(systemName: "arrow.up")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canMoveUp)
+
+                    Button(action: onMoveDown) {
+                        Image(systemName: "arrow.down")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canMoveDown)
+
+                    Button(action: onEdit) {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onOpen) {
+                        Image(systemName: "play.fill")
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+            }
+
+            if !item.performanceNotes.isEmpty {
+                Text(item.performanceNotes)
+                    .font(ASTypography.bodySmall)
+                    .foregroundStyle(.primary)
+            }
+
+            if !item.cueTitle.isEmpty || !item.cueNotes.isEmpty {
+                VStack(alignment: .leading, spacing: ASSpacing.xxs) {
+                    if !item.cueTitle.isEmpty {
+                        Label(item.cueTitle, systemImage: "music.quarternote.3")
+                            .font(ASTypography.caption)
+                    }
+                    if !item.cueNotes.isEmpty {
+                        Text(item.cueNotes)
+                            .font(ASTypography.captionSmall)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
-            Spacer()
+            HStack(spacing: ASSpacing.sm) {
+                transitionChip(style: item.transitionStyle, seconds: item.transitionStyle == .autoAdvance ? item.autoAdvanceDelay : item.pauseDuration)
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.tertiary)
+                if !item.medleyTitle.isEmpty {
+                    rowChip("Medley: \(item.medleyTitle)", systemImage: "link")
+                }
+
+                if let preset = item.performancePreset {
+                    rowChip("Page \(preset.startPageIndex + 1)", systemImage: "bookmark")
+                    if let displayMode = preset.preferredDisplayMode {
+                        rowChip(displayMode.label, systemImage: "rectangle.split.2x1")
+                    }
+                }
+            }
+
+            if item.transitionStyle == .timedPause && !item.pauseNotes.isEmpty {
+                Text(item.pauseNotes)
+                    .font(ASTypography.captionSmall)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+                .overlay(ASColors.chromeBorder)
+
+            HStack {
+                Button("Open in Reader", action: onOpen)
+                    .font(ASTypography.label)
+                    .buttonStyle(.borderedProminent)
+
+                Spacer()
+
+                Button("Delete", role: .destructive, action: onDelete)
+                    .font(ASTypography.caption)
+                    .buttonStyle(.plain)
+            }
         }
-        .padding(.vertical, ASSpacing.xxs)
+        .padding(ASSpacing.md)
+        .background(ASColors.chromeSurface.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
+    }
+
+    private func transitionChip(style: SetlistTransitionStyle, seconds: TimeInterval) -> some View {
+        switch style {
+        case .manual:
+            return rowChip("Manual", systemImage: "hand.tap")
+        case .segue:
+            return rowChip("Segue", systemImage: "forward.frame.fill")
+        case .timedPause:
+            return rowChip("\(Int(seconds))s Pause", systemImage: "timer")
+        case .autoAdvance:
+            return rowChip("\(Int(seconds))s Auto", systemImage: "play.circle")
+        }
+    }
+
+    private func rowChip(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(ASTypography.captionSmall)
+            .padding(.horizontal, ASSpacing.sm)
+            .padding(.vertical, ASSpacing.xs)
+            .background(ASColors.accentFallback.opacity(0.10))
+            .foregroundStyle(.secondary)
+            .clipShape(Capsule())
+    }
+}
+
+private struct SetlistItemEditorView: View {
+    @Bindable var item: SetListItem
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var usesPreset = false
+
+    private var pageCount: Int {
+        max(1, item.score?.pageCount ?? 1)
+    }
+
+    init(item: SetListItem) {
+        self.item = item
+        _usesPreset = State(initialValue: item.performancePreset != nil)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Performance") {
+                    TextField("Song notes", text: $item.performanceNotes, axis: .vertical)
+                    TextField("Cue title", text: $item.cueTitle)
+                    TextField("Cue details", text: $item.cueNotes, axis: .vertical)
+                }
+
+                Section("Transition") {
+                    Picker("Flow", selection: $item.transitionStyle) {
+                        ForEach(SetlistTransitionStyle.allCases, id: \.self) { style in
+                            Text(style.label).tag(style)
+                        }
+                    }
+
+                    if item.transitionStyle == .timedPause {
+                        Stepper(value: $item.pauseDuration, in: 0...180, step: 5) {
+                            Label("\(Int(item.pauseDuration)) second pause", systemImage: "timer")
+                        }
+                        TextField("Pause notes", text: $item.pauseNotes, axis: .vertical)
+                    }
+
+                    if item.transitionStyle == .autoAdvance {
+                        Stepper(value: $item.autoAdvanceDelay, in: 0...180, step: 5) {
+                            Label("\(Int(item.autoAdvanceDelay)) second auto-advance", systemImage: "play.circle")
+                        }
+                    }
+
+                    TextField("Medley / segue group", text: $item.medleyTitle)
+                }
+
+                Section("Reader Preset") {
+                    Toggle("Use item-specific preset", isOn: Binding(
+                        get: { usesPreset },
+                        set: { newValue in
+                            usesPreset = newValue
+                            item.performancePreset = newValue ? (item.performancePreset ?? SetlistPerformancePreset()) : nil
+                        }
+                    ))
+
+                    if usesPreset {
+                        Stepper(value: startPageBinding, in: 0...(pageCount - 1)) {
+                            Text("Start on page \((item.performancePreset?.startPageIndex ?? 0) + 1)")
+                        }
+
+                        Picker("Display", selection: displayModeBinding) {
+                            Text("Single").tag(DisplayMode.singlePage)
+                            Text("Horizontal").tag(DisplayMode.horizontalPaged)
+                            Text("Vertical").tag(DisplayMode.verticalScroll)
+                            Text("Spread").tag(DisplayMode.twoPageSpread)
+                        }
+
+                        Picker("Paper", selection: paperThemeBinding) {
+                            Text("White").tag(PaperTheme.light)
+                            Text("Cream").tag(PaperTheme.sepia)
+                            Text("Warm").tag(PaperTheme.warm)
+                            Text("High Contrast").tag(PaperTheme.highContrast)
+                        }
+
+                        Picker("Page Turn", selection: pageTurnBinding) {
+                            Text("Standard").tag(PageTurnBehavior.standard)
+                            Text("Half Page").tag(PageTurnBehavior.halfPage)
+                            Text("Safe Performance").tag(PageTurnBehavior.safePerformance)
+                        }
+
+                        Toggle("Open in performance mode", isOn: performanceModeBinding)
+                        Toggle("Expect linked session", isOn: linkedModeBinding)
+                    }
+                }
+            }
+            .navigationTitle(item.score?.title ?? "Set Item")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .onDisappear {
+                item.setList?.modifiedAt = Date()
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var startPageBinding: Binding<Int> {
+        Binding(
+            get: { item.performancePreset?.startPageIndex ?? 0 },
+            set: {
+                ensurePreset()
+                item.performancePreset?.startPageIndex = max(0, min($0, pageCount - 1))
+            }
+        )
+    }
+
+    private var displayModeBinding: Binding<DisplayMode> {
+        Binding(
+            get: { item.performancePreset?.preferredDisplayMode ?? .singlePage },
+            set: {
+                ensurePreset()
+                item.performancePreset?.preferredDisplayMode = $0
+            }
+        )
+    }
+
+    private var paperThemeBinding: Binding<PaperTheme> {
+        Binding(
+            get: { item.performancePreset?.preferredPaperTheme ?? .light },
+            set: {
+                ensurePreset()
+                item.performancePreset?.preferredPaperTheme = $0
+            }
+        )
+    }
+
+    private var pageTurnBinding: Binding<PageTurnBehavior> {
+        Binding(
+            get: { item.performancePreset?.preferredPageTurnBehavior ?? .standard },
+            set: {
+                ensurePreset()
+                item.performancePreset?.preferredPageTurnBehavior = $0
+            }
+        )
+    }
+
+    private var performanceModeBinding: Binding<Bool> {
+        Binding(
+            get: { item.performancePreset?.opensInPerformanceMode ?? true },
+            set: {
+                ensurePreset()
+                item.performancePreset?.opensInPerformanceMode = $0
+            }
+        )
+    }
+
+    private var linkedModeBinding: Binding<Bool> {
+        Binding(
+            get: { item.performancePreset?.requiresLinkedMode ?? false },
+            set: {
+                ensurePreset()
+                item.performancePreset?.requiresLinkedMode = $0
+            }
+        )
+    }
+
+    private func ensurePreset() {
+        if item.performancePreset == nil {
+            item.performancePreset = SetlistPerformancePreset()
+        }
+        usesPreset = true
+    }
+}
+
+private extension SetlistTransitionStyle {
+    var label: String {
+        switch self {
+        case .manual: return "Manual"
+        case .segue: return "Segue"
+        case .timedPause: return "Timed Pause"
+        case .autoAdvance: return "Auto Advance"
+        }
+    }
+}
+
+private extension DisplayMode {
+    var label: String {
+        switch self {
+        case .singlePage: return "Single"
+        case .verticalScroll: return "Scroll"
+        case .horizontalPaged: return "Horizontal"
+        case .twoPageSpread: return "Spread"
+        }
     }
 }
 
@@ -256,9 +744,7 @@ struct AddScoresToSetlistView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Sort + batch actions bar
                 HStack(spacing: ASSpacing.sm) {
-                    // Sort pills
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: ASSpacing.sm) {
                             ForEach(AddScoresSortOrder.allCases, id: \.self) { order in
@@ -284,7 +770,6 @@ struct AddScoresToSetlistView: View {
 
                     Spacer()
 
-                    // Select All / Deselect All
                     Button {
                         if selectedScoreIDs.count == filteredScores.count {
                             selectedScoreIDs.removeAll()
@@ -303,7 +788,6 @@ struct AddScoresToSetlistView: View {
 
                 Divider()
 
-                // Score list — native List for proper scrolling + tap selection
                 List {
                     ForEach(Array(filteredScores.enumerated()), id: \.element.id) { index, score in
                         scoreRow(score, index: index)
@@ -314,7 +798,6 @@ struct AddScoresToSetlistView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
 
-                // Selection summary bar
                 HStack {
                     if !selectedScoreIDs.isEmpty {
                         Button("Deselect All") {
@@ -358,14 +841,11 @@ struct AddScoresToSetlistView: View {
         }
     }
 
-    // MARK: - Score Row
-
     private func scoreRow(_ score: Score, index: Int) -> some View {
         let isSelected = selectedScoreIDs.contains(score.id)
         let alreadyInSetlist = existingScoreIDs.contains(score.id)
 
         return HStack(spacing: ASSpacing.md) {
-            // Checkbox
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 22))
                 .foregroundStyle(isSelected ? ASColors.accentFallback : Color.gray.opacity(0.4))
@@ -416,7 +896,6 @@ struct AddScoresToSetlistView: View {
         .background(isSelected ? ASColors.accentFallback.opacity(0.06) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            // Double-tap: range select from last tapped to this one
             rangeSelect(to: index)
         }
         .onTapGesture(count: 1) {
@@ -424,8 +903,6 @@ struct AddScoresToSetlistView: View {
             lastTappedIndex = index
         }
     }
-
-    // MARK: - Selection
 
     private func toggleSelection(_ id: UUID) {
         if selectedScoreIDs.contains(id) {
@@ -435,10 +912,8 @@ struct AddScoresToSetlistView: View {
         }
     }
 
-    /// Range-select: select everything between lastTappedIndex and the given index.
     private func rangeSelect(to index: Int) {
         guard let from = lastTappedIndex else {
-            // No previous tap — just select this one
             if index < filteredScores.count {
                 selectedScoreIDs.insert(filteredScores[index].id)
                 lastTappedIndex = index
@@ -453,8 +928,6 @@ struct AddScoresToSetlistView: View {
         }
         lastTappedIndex = index
     }
-
-    // MARK: - Add
 
     private func addSelectedScores() {
         let currentMaxOrder = setlist.items.map(\.sortOrder).max() ?? -1
