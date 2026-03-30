@@ -37,6 +37,7 @@ public struct ScoreReaderView: View {
     @State private var showingLinkSessionPanel = false
     @State private var showingQuickJumpPanel = false
     @State private var showingPageSetupPanel = false
+    @State private var showingExportSheet = false
 
     // Setlist navigation
     let setlistItems: [SetListItem]?
@@ -93,11 +94,12 @@ public struct ScoreReaderView: View {
                 .allowsHitTesting(false)
             }
 
-            // Annotation canvas overlay — separate layer over reader
-            if annotationState.isAnnotating {
+            // Annotation overlay is always visible; editing is enabled only in annotation mode.
+            if annotationState.isAnnotating || !annotationState.allStrokes.isEmpty || !annotationState.allObjects.isEmpty {
                 AnnotationCanvasView(
                     pageIndex: viewModel.currentPageIndex,
                     pageSize: viewModel.pageSize(at: viewModel.currentPageIndex),
+                    visibleLayerIDsOverride: effectiveVisibleLayerIDs,
                     state: annotationState
                 )
                 .ignoresSafeArea()
@@ -333,6 +335,11 @@ public struct ScoreReaderView: View {
         }
         .sheet(isPresented: $showingDeviceLinkSheet) {
             DevicePairingView(linkService: linkService)
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            ExportAnnotationsView { mode in
+                await exportAnnotations(mode: mode)
+            }
         }
         #if os(macOS)
         .onHover { hovering in
@@ -1055,6 +1062,9 @@ public struct ScoreReaderView: View {
         annotationState.onRestoreSnapshot = { [self] id in
             restoreAnnotationSnapshot(id: id)
         }
+        annotationState.onRequestExport = { [self] in
+            showingExportSheet = true
+        }
     }
 
     private func loadAnnotations() {
@@ -1090,6 +1100,9 @@ public struct ScoreReaderView: View {
             }
         }
         annotationState.allStrokes = loaded
+        annotationState.allObjects = score.annotationLayers.flatMap { layer in
+            layer.objects.compactMap { canvasObject(from: $0, layerID: layer.id) }
+        }
         annotationState.isDirty = false
     }
 
@@ -1107,6 +1120,9 @@ public struct ScoreReaderView: View {
             for stroke in layer.strokes {
                 modelContext.delete(stroke)
             }
+            for object in layer.objects {
+                modelContext.delete(object)
+            }
         }
 
         // Save current strokes
@@ -1115,6 +1131,13 @@ public struct ScoreReaderView: View {
             let stroke = annotationStroke(from: canvasStroke)
             stroke.layer = targetLayer
             modelContext.insert(stroke)
+        }
+
+        for canvasObject in annotationState.allObjects {
+            let targetLayer = score.annotationLayers.first(where: { $0.id == canvasObject.layerID }) ?? defaultLayer
+            let object = annotationObject(from: canvasObject)
+            object.layer = targetLayer
+            modelContext.insert(object)
         }
 
         try? modelContext.save()
@@ -1187,7 +1210,25 @@ public struct ScoreReaderView: View {
                                     pointsData: (try? JSONEncoder().encode(stroke.points)) ?? Data()
                                 )
                             },
-                        objects: []
+                        objects: annotationState.allObjects
+                            .filter { $0.layerID == layer.id }
+                            .map { object in
+                                AnnotationSnapshotPayload.ObjectPayload(
+                                    id: object.id,
+                                    type: object.type.rawValue,
+                                    pageIndex: object.pageIndex,
+                                    x: object.position.x,
+                                    y: object.position.y,
+                                    width: object.size.width,
+                                    height: object.size.height,
+                                    rotation: object.rotation,
+                                    colorHex: object.color.hexString,
+                                    text: object.text,
+                                    fontSize: object.fontSize,
+                                    shapeType: object.shapeType?.rawValue,
+                                    stampType: object.stampType?.rawValue
+                                )
+                            }
                     )
                 }
         )
@@ -1238,7 +1279,25 @@ public struct ScoreReaderView: View {
                 )
             }
         }
-        annotationState.canUndo = !annotationState.allStrokes.isEmpty
+        annotationState.allObjects = payload.layers.flatMap { layer in
+            layer.objects.map { objectPayload in
+                CanvasAnnotationObject(
+                    id: objectPayload.id,
+                    layerID: layer.id,
+                    type: AnnotationObjectType(rawValue: objectPayload.type) ?? .shape,
+                    pageIndex: objectPayload.pageIndex,
+                    position: CGPoint(x: objectPayload.x, y: objectPayload.y),
+                    size: CGSize(width: objectPayload.width, height: objectPayload.height),
+                    rotation: objectPayload.rotation,
+                    color: Color(hex: objectPayload.colorHex),
+                    text: objectPayload.text,
+                    fontSize: objectPayload.fontSize,
+                    shapeType: objectPayload.shapeType.flatMap(ShapeType.init(rawValue:)),
+                    stampType: objectPayload.stampType.flatMap(StampType.init(rawValue:))
+                )
+            }
+        }
+        annotationState.canUndo = !annotationState.allStrokes.isEmpty || !annotationState.allObjects.isEmpty
         annotationState.canRedo = false
         annotationState.isDirty = true
         saveAnnotations()
@@ -1269,6 +1328,42 @@ public struct ScoreReaderView: View {
             pageIndex: canvas.pageIndex,
             pointsData: pointsData
         )
+    }
+
+    private func canvasObject(from object: AnnotationObject, layerID: UUID) -> CanvasAnnotationObject? {
+        CanvasAnnotationObject(
+            id: object.id,
+            layerID: layerID,
+            type: object.type,
+            pageIndex: object.pageIndex,
+            position: CGPoint(x: object.x, y: object.y),
+            size: CGSize(width: object.width, height: object.height),
+            rotation: object.rotation,
+            color: Color(hex: object.colorHex),
+            text: object.text,
+            fontSize: object.fontSize,
+            shapeType: object.shapeType,
+            stampType: object.stampType
+        )
+    }
+
+    private func annotationObject(from canvas: CanvasAnnotationObject) -> AnnotationObject {
+        let object = AnnotationObject(
+            type: canvas.type,
+            pageIndex: canvas.pageIndex,
+            x: canvas.position.x,
+            y: canvas.position.y,
+            width: canvas.size.width,
+            height: canvas.size.height
+        )
+        object.id = canvas.id
+        object.rotation = canvas.rotation
+        object.colorHex = canvas.color.hexString
+        object.text = canvas.text
+        object.fontSize = canvas.fontSize
+        object.shapeType = canvas.shapeType
+        object.stampType = canvas.stampType
+        return object
     }
 
     // MARK: - Setlist Navigation
@@ -1354,6 +1449,29 @@ public struct ScoreReaderView: View {
 
     private var isCurrentPageBookmarked: Bool {
         currentPageBookmark != nil
+    }
+
+    private var effectiveVisibleLayerIDs: Set<UUID>? {
+        if annotationState.isAnnotating {
+            return nil
+        }
+
+        switch linkService.displayMode {
+        case .conductorPerformer:
+            let visibleLayers = annotationState.layers.filter { layer in
+                switch linkService.localRole {
+                case .conductor:
+                    return layer.type != .performer
+                case .performer:
+                    return layer.type != .teacher && layer.type != .rehearsal
+                default:
+                    return layer.isVisible
+                }
+            }
+            return Set(visibleLayers.filter(\.isVisible).map(\.id))
+        default:
+            return nil
+        }
     }
 
     private var activeCropInsets: NormalizedPageInsets {
@@ -2131,6 +2249,47 @@ public struct ScoreReaderView: View {
         case .repeatStart: "Repeat Start"
         case .repeatEnd: "Repeat End"
         case .custom: "Jump Link"
+        }
+    }
+
+    private func exportAnnotations(mode: PDFExportMode) async -> Result<URL, Error> {
+        saveAnnotations()
+        let exporter = AnnotatedPDFExporter()
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let safeTitle = viewModel.score.title.replacingOccurrences(of: " ", with: "-")
+
+        do {
+            switch mode {
+            case .flattened:
+                let outputURL = tempDirectory.appendingPathComponent("\(safeTitle)-annotated.pdf")
+                let url = try await exporter.exportFlattened(
+                    sourceURL: fileURL,
+                    strokes: annotationState.allStrokes,
+                    objects: annotationState.allObjects,
+                    outputURL: outputURL
+                )
+                return .success(url)
+            case .editable:
+                let outputURL = tempDirectory.appendingPathComponent("\(safeTitle)-annotations-editable.json")
+                let url = try await exporter.exportRawData(
+                    strokes: annotationState.allStrokes,
+                    objects: annotationState.allObjects,
+                    layers: annotationState.layers,
+                    outputURL: outputURL
+                )
+                return .success(url)
+            case .rawData:
+                let outputURL = tempDirectory.appendingPathComponent("\(safeTitle)-annotations-raw.json")
+                let url = try await exporter.exportRawData(
+                    strokes: annotationState.allStrokes,
+                    objects: annotationState.allObjects,
+                    layers: annotationState.layers,
+                    outputURL: outputURL
+                )
+                return .success(url)
+            }
+        } catch {
+            return .failure(error)
         }
     }
 

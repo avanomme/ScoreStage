@@ -122,3 +122,24 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - Start Sprint 1 from the parity matrix
 - Use `Complete next Sprint` as the execution command for each sprint in sequence
+
+---
+
+## 2026-03-30 — Sprint 2 Complete: Annotation / Markup
+
+**What changed:**
+- Expanded the annotation model from stroke-only markup into a mixed stroke/object editing system with persistent text, shape, and stamp objects
+- Added object selection, move, resize, duplicate, delete, and inspector-driven editing so annotation objects can be revised instead of recreated
+- Hardened annotation history behavior to cover layers, page clears, object creation, and object edits through undo/redo
+- Upgraded layer management with rename and reordering support, then persisted layer/object state back through the reader save path
+- Kept saved annotations visible during normal reading, with linked-session visibility filtering for conductor/performer use cases
+- Finished annotation export so flattened PDF export and raw editable data export both include object-based markup in addition to strokes
+
+**Verification:**
+- `swift build` in `Packages/AnnotationFeature`
+- `swift build` in `Packages/ReaderFeature`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Start Sprint 3 from the parity matrix
+- Focus on full setlist and live show workflow completeness before moving to library power-user features

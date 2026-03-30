@@ -7,6 +7,7 @@ import DesignSystem
 public struct LayerManagerView: View {
     @Bindable var state: AnnotationState
     @State private var isAddingLayer = false
+    @State private var renamingLayerID: UUID?
     @State private var newLayerName = ""
     @State private var newLayerType: AnnotationLayerType = .custom
 
@@ -90,11 +91,49 @@ public struct LayerManagerView: View {
                 .frame(width: 16)
 
             // Layer name
-            Text(layer.name)
-                .font(.system(size: 12, weight: state.activeLayerID == layer.id ? .semibold : .regular))
-                .lineLimit(1)
+            if renamingLayerID == layer.id {
+                TextField("Layer Name", text: $newLayerName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11))
+                    .onSubmit {
+                        state.renameLayer(layer.id, to: newLayerName.isEmpty ? layer.name : newLayerName)
+                        renamingLayerID = nil
+                    }
+            } else {
+                Text(layer.name)
+                    .font(.system(size: 12, weight: state.activeLayerID == layer.id ? .semibold : .regular))
+                    .lineLimit(1)
+            }
 
             Spacer()
+
+            Button {
+                state.moveLayer(layer.id, direction: .up)
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                state.moveLayer(layer.id, direction: .down)
+            } label: {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                renamingLayerID = layer.id
+                newLayerName = layer.name
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
 
             // Active indicator
             if state.activeLayerID == layer.id {

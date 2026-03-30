@@ -35,6 +35,49 @@ public enum AnnotationTool: String, CaseIterable, Identifiable {
     }
 }
 
+public struct CanvasAnnotationObject: Identifiable, Sendable {
+    public let id: UUID
+    public var layerID: UUID
+    public var type: AnnotationObjectType
+    public var pageIndex: Int
+    public var position: CGPoint
+    public var size: CGSize
+    public var rotation: Double
+    public var color: Color
+    public var text: String?
+    public var fontSize: Double?
+    public var shapeType: ShapeType?
+    public var stampType: StampType?
+
+    public init(
+        id: UUID = UUID(),
+        layerID: UUID,
+        type: AnnotationObjectType,
+        pageIndex: Int,
+        position: CGPoint,
+        size: CGSize = CGSize(width: 120, height: 40),
+        rotation: Double = 0,
+        color: Color,
+        text: String? = nil,
+        fontSize: Double? = nil,
+        shapeType: ShapeType? = nil,
+        stampType: StampType? = nil
+    ) {
+        self.id = id
+        self.layerID = layerID
+        self.type = type
+        self.pageIndex = pageIndex
+        self.position = position
+        self.size = size
+        self.rotation = rotation
+        self.color = color
+        self.text = text
+        self.fontSize = fontSize
+        self.shapeType = shapeType
+        self.stampType = stampType
+    }
+}
+
 /// Lightweight layer info for UI display without SwiftData coupling.
 public struct LayerInfo: Identifiable, Sendable {
     public let id: UUID
@@ -74,7 +117,12 @@ public final class AnnotationState {
     // MARK: - Stroke Storage (centralized across pages)
 
     public var allStrokes: [CanvasStroke] = []
-    private var undoneStrokes: [CanvasStroke] = []
+    public var allObjects: [CanvasAnnotationObject] = []
+    private var undoStack: [HistoryState] = []
+    private var redoStack: [HistoryState] = []
+    public var selectedObjectID: UUID?
+    public var selectedShapeType: ShapeType = .rectangle
+    public var defaultTextValue = "Text"
 
     /// Callback fired when annotations should be saved (on Done / exit).
     public var onSave: (() -> Void)?
@@ -102,6 +150,9 @@ public final class AnnotationState {
     public var onCreateSnapshot: ((String) -> Void)?
     /// Callback for restoring a snapshot — set by the hosting view controller.
     public var onRestoreSnapshot: ((UUID) -> Void)?
+    public var onRequestExport: (() -> Void)?
+    /// Optional layer visibility override supplied by the host.
+    public var visibleLayerIDsOverride: Set<UUID>?
 
     /// The name of the active layer, for display.
     public var activeLayerName: String {
@@ -110,7 +161,7 @@ public final class AnnotationState {
 
     /// IDs of currently visible layers.
     public var visibleLayerIDs: Set<UUID> {
-        Set(layers.filter(\.isVisible).map(\.id))
+        visibleLayerIDsOverride ?? Set(layers.filter(\.isVisible).map(\.id))
     }
 
     public init() {
@@ -121,43 +172,46 @@ public final class AnnotationState {
     // MARK: - Stroke Operations
 
     public func addStroke(_ stroke: CanvasStroke) {
+        recordHistory()
         allStrokes.append(stroke)
-        undoneStrokes.removeAll()
         isDirty = true
-        canUndo = true
-        canRedo = false
+        updateUndoRedoAvailability()
     }
 
     public func undo() {
-        guard let last = allStrokes.popLast() else { return }
-        undoneStrokes.append(last)
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(makeHistoryState())
+        restore(from: previous)
         isDirty = true
-        canUndo = !allStrokes.isEmpty
-        canRedo = true
+        updateUndoRedoAvailability()
     }
 
     public func redo() {
-        guard let last = undoneStrokes.popLast() else { return }
-        allStrokes.append(last)
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(makeHistoryState())
+        restore(from: next)
         isDirty = true
-        canUndo = true
-        canRedo = !undoneStrokes.isEmpty
+        updateUndoRedoAvailability()
     }
 
     /// Remove all strokes on the given page.
     public func clearPage(_ pageIndex: Int) {
+        recordHistory()
         allStrokes.removeAll { $0.pageIndex == pageIndex }
+        allObjects.removeAll { $0.pageIndex == pageIndex }
         isDirty = true
-        canUndo = !allStrokes.isEmpty
+        selectedObjectID = nil
+        updateUndoRedoAvailability()
     }
 
     /// Remove all strokes on all pages.
     public func clearAll() {
+        recordHistory()
         allStrokes.removeAll()
-        undoneStrokes.removeAll()
+        allObjects.removeAll()
+        selectedObjectID = nil
         isDirty = true
-        canUndo = false
-        canRedo = false
+        updateUndoRedoAvailability()
     }
 
     /// Save and exit annotation mode.
@@ -193,24 +247,29 @@ public final class AnnotationState {
     // MARK: - Layer Operations
 
     public func addLayer(name: String, type: AnnotationLayerType) {
+        recordHistory()
         let nextOrder = (layers.map(\.sortOrder).max() ?? 0) + 1
         let layer = LayerInfo(name: name, type: type, sortOrder: nextOrder)
         layers.append(layer)
         activeLayerID = layer.id
         isDirty = true
+        updateUndoRedoAvailability()
     }
 
     public func removeLayer(_ id: UUID) {
         // Cannot remove the default layer
         guard let layer = layers.first(where: { $0.id == id }), layer.type != .default else { return }
+        recordHistory()
         layers.removeAll(where: { $0.id == id })
         allStrokes.removeAll(where: { $0.layerID == id })
+        allObjects.removeAll(where: { $0.layerID == id })
         // If we removed the active layer, fall back to default
         if activeLayerID == id {
             activeLayerID = layers.first(where: { $0.type == .default })?.id ?? layers.first?.id
         }
-        canUndo = !allStrokes.isEmpty
+        selectedObjectID = nil
         isDirty = true
+        updateUndoRedoAvailability()
     }
 
     public func setActiveLayer(_ id: UUID) {
@@ -220,14 +279,122 @@ public final class AnnotationState {
 
     public func toggleLayerVisibility(_ id: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        recordHistory()
         layers[index].isVisible.toggle()
         isDirty = true
+        updateUndoRedoAvailability()
     }
 
     public func renameLayer(_ id: UUID, to name: String) {
         guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        recordHistory()
         layers[index].name = name
         isDirty = true
+        updateUndoRedoAvailability()
+    }
+
+    public func moveLayer(_ id: UUID, direction: MoveDirection) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        let targetIndex: Int
+        switch direction {
+        case .up:
+            targetIndex = max(0, index - 1)
+        case .down:
+            targetIndex = min(layers.count - 1, index + 1)
+        }
+        guard targetIndex != index else { return }
+        recordHistory()
+        let layer = layers.remove(at: index)
+        layers.insert(layer, at: targetIndex)
+        for position in layers.indices {
+            layers[position].sortOrder = position
+        }
+        isDirty = true
+        updateUndoRedoAvailability()
+    }
+
+    // MARK: - Object Operations
+
+    public func addObject(_ object: CanvasAnnotationObject) {
+        recordHistory()
+        allObjects.append(object)
+        selectedObjectID = object.id
+        isDirty = true
+        updateUndoRedoAvailability()
+    }
+
+    public func updateObject(_ object: CanvasAnnotationObject) {
+        guard let index = allObjects.firstIndex(where: { $0.id == object.id }) else { return }
+        allObjects[index] = object
+        selectedObjectID = object.id
+        isDirty = true
+    }
+
+    public func beginObjectEdit() {
+        recordHistory()
+    }
+
+    public func deleteSelectedObject() {
+        guard let selectedObjectID else { return }
+        recordHistory()
+        allObjects.removeAll { $0.id == selectedObjectID }
+        self.selectedObjectID = nil
+        isDirty = true
+        updateUndoRedoAvailability()
+    }
+
+    public func duplicateSelectedObject() {
+        guard let object = selectedObject else { return }
+        recordHistory()
+        var duplicate = object
+        duplicate = CanvasAnnotationObject(
+            layerID: object.layerID,
+            type: object.type,
+            pageIndex: object.pageIndex,
+            position: CGPoint(x: object.position.x + 18, y: object.position.y + 18),
+            size: object.size,
+            rotation: object.rotation,
+            color: object.color,
+            text: object.text,
+            fontSize: object.fontSize,
+            shapeType: object.shapeType,
+            stampType: object.stampType
+        )
+        allObjects.append(duplicate)
+        selectedObjectID = duplicate.id
+        isDirty = true
+        updateUndoRedoAvailability()
+    }
+
+    public func setSelectedObject(_ id: UUID?) {
+        selectedObjectID = id
+    }
+
+    public var selectedObject: CanvasAnnotationObject? {
+        allObjects.first(where: { $0.id == selectedObjectID })
+    }
+
+    public func commitObjectEdit() {
+        isDirty = true
+        updateUndoRedoAvailability()
+    }
+
+    public func updateSelectedObjectText(_ text: String) {
+        guard var object = selectedObject else { return }
+        object.text = text
+        updateObject(object)
+    }
+
+    public func updateSelectedObjectShape(_ shapeType: ShapeType) {
+        guard var object = selectedObject else { return }
+        object.shapeType = shapeType
+        updateObject(object)
+    }
+
+    public func updateSelectedObjectColor(_ color: Color) {
+        guard var object = selectedObject else { return }
+        object.color = color
+        updateObject(object)
     }
 
     // MARK: - Snapshot Operations
@@ -241,6 +408,53 @@ public final class AnnotationState {
     public func removeSnapshot(_ id: UUID) {
         snapshots.removeAll(where: { $0.id == id })
     }
+
+    // MARK: - History
+
+    public enum MoveDirection {
+        case up
+        case down
+    }
+
+    private struct HistoryState {
+        let strokes: [CanvasStroke]
+        let objects: [CanvasAnnotationObject]
+        let layers: [LayerInfo]
+        let activeLayerID: UUID?
+        let selectedObjectID: UUID?
+    }
+
+    private func makeHistoryState() -> HistoryState {
+        HistoryState(
+            strokes: allStrokes,
+            objects: allObjects,
+            layers: layers,
+            activeLayerID: activeLayerID,
+            selectedObjectID: selectedObjectID
+        )
+    }
+
+    private func restore(from history: HistoryState) {
+        allStrokes = history.strokes
+        allObjects = history.objects
+        layers = history.layers
+        activeLayerID = history.activeLayerID
+        selectedObjectID = history.selectedObjectID
+    }
+
+    private func recordHistory() {
+        undoStack.append(makeHistoryState())
+        if undoStack.count > 100 {
+            undoStack.removeFirst()
+        }
+        redoStack.removeAll()
+        updateUndoRedoAvailability()
+    }
+
+    private func updateUndoRedoAvailability() {
+        canUndo = !undoStack.isEmpty
+        canRedo = !redoStack.isEmpty
+    }
 }
 
 /// Floating Procreate-style annotation palette.
@@ -249,6 +463,7 @@ public struct AnnotationToolbarView: View {
     @Bindable var state: AnnotationState
     @State private var showingColorPicker = false
     @State private var showingWidthSlider = false
+    @State private var selectedObjectText = ""
 
     public init(state: AnnotationState) {
         self.state = state
@@ -346,6 +561,40 @@ public struct AnnotationToolbarView: View {
 
                 divider
 
+                Button {
+                    state.onRequestExport?()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+                .help("Export Annotations")
+
+                if state.selectedObject != nil {
+                    divider
+
+                    Button {
+                        state.duplicateSelectedObject()
+                    } label: {
+                        Image(systemName: "plus.square.on.square")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Duplicate Selection")
+
+                    Button {
+                        state.deleteSelectedObject()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete Selection")
+                }
+
                 // Layers toggle
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -411,6 +660,11 @@ public struct AnnotationToolbarView: View {
             // Expandable width slider
             if showingWidthSlider {
                 widthSlider
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if let selectedObject = state.selectedObject {
+                objectInspector(selectedObject)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -494,6 +748,42 @@ public struct AnnotationToolbarView: View {
                 .frame(width: 14, height: 14)
         }
         .padding(.horizontal, ASSpacing.lg)
+        .padding(.vertical, ASSpacing.sm)
+    }
+
+    private func objectInspector(_ object: CanvasAnnotationObject) -> some View {
+        VStack(alignment: .leading, spacing: ASSpacing.sm) {
+            Text("Selection")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            if object.type == .textBox || object.type == .stamp {
+                TextField("Text", text: Binding(
+                    get: { object.text ?? selectedObjectText },
+                    set: { newValue in
+                        selectedObjectText = newValue
+                        state.updateSelectedObjectText(newValue)
+                    }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12))
+            }
+
+            if object.type == .shape {
+                Picker("Shape", selection: Binding(
+                    get: { object.shapeType ?? .rectangle },
+                    set: { state.updateSelectedObjectShape($0) }
+                )) {
+                    Text("Rect").tag(ShapeType.rectangle)
+                    Text("Circle").tag(ShapeType.circle)
+                    Text("Line").tag(ShapeType.underline)
+                    Text("Arrow").tag(ShapeType.arrow)
+                }
+                .pickerStyle(.segmented)
+                .font(.system(size: 11))
+            }
+        }
+        .padding(.horizontal, ASSpacing.md)
         .padding(.vertical, ASSpacing.sm)
     }
 
