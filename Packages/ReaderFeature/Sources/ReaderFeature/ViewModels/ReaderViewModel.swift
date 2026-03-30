@@ -13,6 +13,12 @@ public final class ReaderViewModel {
     public var paperTheme: PaperTheme = .light
     public var isPerformanceMode: Bool = false
     public var zoomScale: CGFloat = 1.0
+    public var cropInsets: NormalizedPageInsets = .none
+    public var isCropMarginsEnabled = false
+    public var brightnessAdjustment: Double = 0
+    public var contrastAdjustment: Double = 1.0
+    public var pageTurnBehavior: PageTurnBehavior = .standard
+    public var showingLowerHalf = false
     public var renderedPages: [Int: CGImage] = [:]
     public var isLoading: Bool = true
 
@@ -23,6 +29,11 @@ public final class ReaderViewModel {
             self.displayMode = prefs.displayMode
             self.paperTheme = prefs.paperTheme
             self.zoomScale = prefs.zoomLevel
+            self.isCropMarginsEnabled = prefs.isCropMarginsEnabled
+            self.cropInsets = prefs.cropInsets
+            self.brightnessAdjustment = prefs.brightnessAdjustment
+            self.contrastAdjustment = prefs.contrastAdjustment
+            self.pageTurnBehavior = prefs.pageTurnBehavior
         }
     }
 
@@ -38,16 +49,25 @@ public final class ReaderViewModel {
     public func goToPage(_ index: Int) async {
         guard index >= 0 && index < pageCount else { return }
         currentPageIndex = index
+        showingLowerHalf = false
         await renderCurrentPage()
         renderService.prefetchPages(around: index)
     }
 
     public func nextPage() async {
+        if displayMode == .singlePage, pageTurnBehavior == .halfPage, !showingLowerHalf {
+            showingLowerHalf = true
+            return
+        }
         let step = displayMode == .twoPageSpread ? 2 : 1
         await goToPage(min(currentPageIndex + step, pageCount - 1))
     }
 
     public func previousPage() async {
+        if displayMode == .singlePage, pageTurnBehavior == .halfPage, showingLowerHalf {
+            showingLowerHalf = false
+            return
+        }
         let step = displayMode == .twoPageSpread ? 2 : 1
         await goToPage(max(currentPageIndex - step, 0))
     }
@@ -66,7 +86,12 @@ public final class ReaderViewModel {
     }
 
     public func pageSize(at index: Int) -> CGSize {
-        renderService.pageSize(at: index)
+        let baseSize = renderService.pageSize(at: index)
+        guard isCropMarginsEnabled else { return baseSize }
+
+        let widthScale = max(0.2, 1 - cropInsets.leading - cropInsets.trailing)
+        let heightScale = max(0.2, 1 - cropInsets.top - cropInsets.bottom)
+        return CGSize(width: baseSize.width * widthScale, height: baseSize.height * heightScale)
     }
 
     /// Score paper is always light — musicians expect printed-notation contrast.
@@ -84,7 +109,12 @@ public final class ReaderViewModel {
         score.viewingPreferences = ViewingPreferences(
             displayMode: displayMode,
             paperTheme: paperTheme,
-            zoomLevel: zoomScale
+            zoomLevel: zoomScale,
+            isCropMarginsEnabled: isCropMarginsEnabled,
+            cropInsets: cropInsets,
+            brightnessAdjustment: brightnessAdjustment,
+            contrastAdjustment: contrastAdjustment,
+            pageTurnBehavior: pageTurnBehavior
         )
     }
 

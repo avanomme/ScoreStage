@@ -229,6 +229,10 @@ public final class DeviceLinkService: NSObject {
         self.localRole = localRole
         sendMessage(.displayModeChanged(mode: displayMode.rawValue))
         sendMessage(.roleAssignment(role: remoteRole.rawValue))
+        if let openedScoreID {
+            sendMessage(.scoreOpened(scoreID: openedScoreID))
+        }
+        sendMessage(.pageChanged(pageIndex: currentPageIndex))
     }
 
     public var isLinked: Bool {

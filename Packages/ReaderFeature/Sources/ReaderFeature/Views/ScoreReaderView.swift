@@ -35,6 +35,8 @@ public struct ScoreReaderView: View {
     @State private var suppressLinkedBroadcast = false
     @State private var showingBookmarksPanel = false
     @State private var showingLinkSessionPanel = false
+    @State private var showingQuickJumpPanel = false
+    @State private var showingPageSetupPanel = false
 
     // Setlist navigation
     let setlistItems: [SetListItem]?
@@ -191,6 +193,34 @@ public struct ScoreReaderView: View {
                 }
             }
 
+            if showingQuickJumpPanel && !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    HStack {
+                        quickJumpPanel
+                            .frame(width: 340)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        Spacer()
+                    }
+                    .padding(.leading, ASSpacing.lg)
+                    .padding(.bottom, showingPlayback ? 110 : ASSpacing.screenPadding)
+                }
+            }
+
+            if showingPageSetupPanel && !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        pageSetupPanel
+                            .frame(width: 340)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                    .padding(.trailing, ASSpacing.lg)
+                    .padding(.bottom, showingPlayback ? 110 : ASSpacing.screenPadding)
+                }
+            }
+
             // Mixer panel — floating on the left
             if showingMixer {
                 VStack {
@@ -270,6 +300,26 @@ public struct ScoreReaderView: View {
             saveReaderSession()
         }
         .onChange(of: viewModel.paperTheme) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
+        }
+        .onChange(of: viewModel.pageTurnBehavior) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
+        }
+        .onChange(of: viewModel.isCropMarginsEnabled) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
+        }
+        .onChange(of: viewModel.cropInsets) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
+        }
+        .onChange(of: viewModel.brightnessAdjustment) { _, _ in
+            persistReaderPreferences()
+            saveReaderSession()
+        }
+        .onChange(of: viewModel.contrastAdjustment) { _, _ in
             persistReaderPreferences()
             saveReaderSession()
         }
@@ -368,7 +418,11 @@ public struct ScoreReaderView: View {
     private func singlePageView(in size: CGSize) -> some View {
         PDFPageView(
             image: viewModel.renderedPages[viewModel.currentPageIndex],
-            pageSize: viewModel.pageSize(at: viewModel.currentPageIndex)
+            pageSize: viewModel.pageSize(at: viewModel.currentPageIndex),
+            cropInsets: activeCropInsets,
+            brightness: viewModel.brightnessAdjustment,
+            contrast: viewModel.contrastAdjustment,
+            slice: currentPageSlice
         )
         .scaleEffect(viewModel.zoomScale)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -381,7 +435,10 @@ public struct ScoreReaderView: View {
             ForEach(0..<viewModel.pageCount, id: \.self) { index in
                 PDFPageView(
                     image: viewModel.renderedPages[index],
-                    pageSize: viewModel.pageSize(at: index)
+                    pageSize: viewModel.pageSize(at: index),
+                    cropInsets: activeCropInsets,
+                    brightness: viewModel.brightnessAdjustment,
+                    contrast: viewModel.contrastAdjustment
                 )
                 .tag(index)
                 .task {
@@ -404,7 +461,10 @@ public struct ScoreReaderView: View {
                 ForEach(0..<viewModel.pageCount, id: \.self) { index in
                     PDFPageView(
                         image: viewModel.renderedPages[index],
-                        pageSize: viewModel.pageSize(at: index)
+                        pageSize: viewModel.pageSize(at: index),
+                        cropInsets: activeCropInsets,
+                        brightness: viewModel.brightnessAdjustment,
+                        contrast: viewModel.contrastAdjustment
                     )
                     .task {
                         if viewModel.renderedPages[index] == nil {
@@ -425,14 +485,20 @@ public struct ScoreReaderView: View {
 
             PDFPageView(
                 image: viewModel.renderedPages[leftIndex],
-                pageSize: viewModel.pageSize(at: leftIndex)
+                pageSize: viewModel.pageSize(at: leftIndex),
+                cropInsets: activeCropInsets,
+                brightness: viewModel.brightnessAdjustment,
+                contrast: viewModel.contrastAdjustment
             )
             .frame(maxWidth: size.width / 2)
 
             if rightIndex < viewModel.pageCount {
                 PDFPageView(
                     image: viewModel.renderedPages[rightIndex],
-                    pageSize: viewModel.pageSize(at: rightIndex)
+                    pageSize: viewModel.pageSize(at: rightIndex),
+                    cropInsets: activeCropInsets,
+                    brightness: viewModel.brightnessAdjustment,
+                    contrast: viewModel.contrastAdjustment
                 )
                 .frame(maxWidth: size.width / 2)
             }
@@ -446,7 +512,10 @@ public struct ScoreReaderView: View {
         TwoDeviceSpreadView(linkService: linkService, pageCount: viewModel.pageCount) { index in
             PDFPageView(
                 image: viewModel.renderedPages[index],
-                pageSize: viewModel.pageSize(at: index)
+                pageSize: viewModel.pageSize(at: index),
+                cropInsets: activeCropInsets,
+                brightness: viewModel.brightnessAdjustment,
+                contrast: viewModel.contrastAdjustment
             )
             .scaleEffect(viewModel.zoomScale)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -469,11 +538,22 @@ public struct ScoreReaderView: View {
         SpatialTapGesture()
             .onEnded { value in
                 let x = value.location.x / size.width
+                let y = value.location.y / size.height
+                let isSafeMode = viewModel.isPerformanceMode || viewModel.pageTurnBehavior == .safePerformance
+
+                if y < 0.08 {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showingControls.toggle()
+                    }
+                    if showingControls { scheduleControlsHide() }
+                    return
+                }
+
                 if x > 0.6 {
                     Task { await viewModel.nextPage() }
                 } else if x < 0.4 {
                     Task { await viewModel.previousPage() }
-                } else {
+                } else if !isSafeMode {
                     // Center tap toggles controls
                     withAnimation(.easeOut(duration: 0.2)) {
                         showingControls.toggle()
@@ -555,9 +635,19 @@ public struct ScoreReaderView: View {
                 Spacer()
 
                 HStack(spacing: ASSpacing.sm) {
+                    topUtilityButton(icon: "list.bullet.rectangle.portrait") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingQuickJumpPanel.toggle()
+                        }
+                    }
                     topUtilityButton(icon: isCurrentPageBookmarked ? "bookmark.fill" : "bookmark") {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showingBookmarksPanel.toggle()
+                        }
+                    }
+                    topUtilityButton(icon: "slider.horizontal.3") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingPageSetupPanel.toggle()
                         }
                     }
                     topUtilityButton(icon: isLinkedSessionActive ? "dot.radiowaves.left.and.right" : "ipad.and.iphone") {
@@ -620,8 +710,24 @@ public struct ScoreReaderView: View {
 
                 controlDivider
 
+                controlButton(icon: "list.bullet.rectangle.portrait", label: "Jump", isActive: showingQuickJumpPanel) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingQuickJumpPanel.toggle()
+                    }
+                }
+
+                controlDivider
+
                 controlButton(icon: isCurrentPageBookmarked ? "bookmark.fill" : "bookmark", label: "Bookmark", isActive: isCurrentPageBookmarked) {
                     toggleCurrentPageBookmark()
+                }
+
+                controlDivider
+
+                controlButton(icon: "slider.horizontal.3", label: "Page", isActive: showingPageSetupPanel) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingPageSetupPanel.toggle()
+                    }
                 }
 
                 controlDivider
@@ -1250,8 +1356,42 @@ public struct ScoreReaderView: View {
         currentPageBookmark != nil
     }
 
+    private var activeCropInsets: NormalizedPageInsets {
+        viewModel.isCropMarginsEnabled ? viewModel.cropInsets : .none
+    }
+
+    private var currentPageSlice: ReaderPageSlice {
+        guard viewModel.displayMode == .singlePage, viewModel.pageTurnBehavior == .halfPage else {
+            return .full
+        }
+        return viewModel.showingLowerHalf ? .bottomHalf : .topHalf
+    }
+
+    private var rehearsalMarks: [RehearsalMarkInfo] {
+        guard let map = measureMap else { return [] }
+        return RehearsalMarkInfo.from(measureMap: map)
+    }
+
+    private var navigationHotspots: [JumpNavigationEngine.NavigationHotspot] {
+        guard let normalizedScore else { return [] }
+        return JumpNavigationEngine().extractHotspots(from: normalizedScore)
+            .filter { $0.destinationMeasure != nil }
+    }
+
+    private var currentPageStructuralJumps: [JumpNavigationEngine.NavigationHotspot] {
+        navigationHotspots.filter { hotspot in
+            estimatedPageIndex(forMeasure: hotspot.measureNumber) == viewModel.currentPageIndex
+        }
+    }
+
     private var pageProgressLabel: String {
-        "\(viewModel.currentPageIndex + 1) / \(viewModel.pageCount)"
+        let suffix: String
+        if viewModel.displayMode == .singlePage, viewModel.pageTurnBehavior == .halfPage {
+            suffix = viewModel.showingLowerHalf ? "B" : "A"
+        } else {
+            suffix = ""
+        }
+        return "\(viewModel.currentPageIndex + 1)\(suffix) / \(viewModel.pageCount)"
     }
 
     private var displayModeLabel: String {
@@ -1270,6 +1410,14 @@ public struct ScoreReaderView: View {
         case .warm: "Warm"
         case .highContrast: "Sharp"
         case .dark: "White"
+        }
+    }
+
+    private var pageTurnBehaviorLabel: String {
+        switch viewModel.pageTurnBehavior {
+        case .standard: "Standard"
+        case .halfPage: "Half Page"
+        case .safePerformance: "Safe"
         }
     }
 
@@ -1576,6 +1724,274 @@ public struct ScoreReaderView: View {
         .background(readerHUDPanel)
     }
 
+    private var quickJumpPanel: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack {
+                Text("Quick Jump")
+                    .font(ASTypography.heading3)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingQuickJumpPanel = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !currentPageStructuralJumps.isEmpty {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text("On This Page")
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+
+                    ForEach(currentPageStructuralJumps) { hotspot in
+                        quickJumpRow(
+                            title: hotspot.label,
+                            subtitle: structuralJumpSubtitle(hotspot),
+                            accent: ASColors.warning
+                        ) {
+                            navigate(toHotspot: hotspot)
+                        }
+                    }
+                }
+            }
+
+            if !sortedBookmarks.isEmpty {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text("Bookmarks")
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+
+                    ScrollView {
+                        VStack(spacing: ASSpacing.xs) {
+                            ForEach(sortedBookmarks) { bookmark in
+                                quickJumpRow(
+                                    title: bookmark.name,
+                                    subtitle: "Page \(bookmark.pageIndex + 1)",
+                                    accent: Color(hex: bookmark.colorHex) ?? ASColors.accentFallback
+                                ) {
+                                    Task { await navigateToPage(bookmark.pageIndex) }
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 120)
+                }
+            }
+
+            if !rehearsalMarks.isEmpty {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text("Rehearsal")
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+
+                    ScrollView {
+                        VStack(spacing: ASSpacing.xs) {
+                            ForEach(rehearsalMarks) { mark in
+                                quickJumpRow(
+                                    title: mark.label,
+                                    subtitle: "Measure \(mark.measureNumber)",
+                                    accent: ASColors.info
+                                ) {
+                                    navigateToMeasure(mark.measureNumber)
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 140)
+                }
+            }
+
+            if !viewModel.score.jumpLinks.isEmpty {
+                VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                    Text("Manual Links")
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+
+                    ForEach(viewModel.score.jumpLinks.sorted { $0.sourcePageIndex < $1.sourcePageIndex }) { link in
+                        quickJumpRow(
+                            title: link.label.isEmpty ? jumpTypeLabel(link.type) : link.label,
+                            subtitle: "Page \(link.sourcePageIndex + 1) to \(link.destinationPageIndex + 1)",
+                            accent: ASColors.success
+                        ) {
+                            Task { await navigateToPage(link.destinationPageIndex) }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(ASSpacing.lg)
+        .background(readerHUDPanel)
+    }
+
+    private var pageSetupPanel: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack {
+                Text("Page Setup")
+                    .font(ASTypography.heading3)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button("Reset") {
+                    resetPageSetup()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ASColors.accentFallback)
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Turn Behavior")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: ASSpacing.sm) {
+                    pageSetupOption(title: "Standard", subtitle: "Center tap allowed", isActive: viewModel.pageTurnBehavior == .standard) {
+                        viewModel.pageTurnBehavior = .standard
+                    }
+                    pageSetupOption(title: "Half Page", subtitle: "A/B reading flow", isActive: viewModel.pageTurnBehavior == .halfPage) {
+                        viewModel.pageTurnBehavior = .halfPage
+                    }
+                    pageSetupOption(title: "Safe", subtitle: "Top strip unlock", isActive: viewModel.pageTurnBehavior == .safePerformance) {
+                        viewModel.pageTurnBehavior = .safePerformance
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                HStack {
+                    Text("Margin Crop")
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Toggle("", isOn: $viewModel.isCropMarginsEnabled)
+                        .labelsHidden()
+                }
+
+                HStack(spacing: ASSpacing.sm) {
+                    pageSetupOption(title: "None", subtitle: "Full page", isActive: activeCropInsets == .none) {
+                        applyCropPreset(.none)
+                    }
+                    pageSetupOption(title: "Tight", subtitle: "Light trim", isActive: activeCropInsets == .narrow) {
+                        applyCropPreset(.narrow)
+                    }
+                    pageSetupOption(title: "Stage", subtitle: "Bigger notes", isActive: activeCropInsets == .medium) {
+                        applyCropPreset(.medium)
+                    }
+                }
+
+                HStack(spacing: ASSpacing.sm) {
+                    pageSetupOption(title: "Top", subtitle: "\(Int(viewModel.cropInsets.top * 100))%", isActive: false) {}
+                    Slider(value: binding(for: \.top), in: 0...0.12, step: 0.01)
+                }
+                HStack(spacing: ASSpacing.sm) {
+                    pageSetupOption(title: "Side", subtitle: "\(Int(viewModel.cropInsets.leading * 100))%", isActive: false) {}
+                    Slider(value: binding(for: \.leading), in: 0...0.10, step: 0.01)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Paper Tuning")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                HStack(spacing: ASSpacing.sm) {
+                    pageSetupOption(title: paperThemeLabel, subtitle: "Theme", isActive: false) {}
+                    Spacer()
+                    Text(pageTurnBehaviorLabel)
+                        .font(ASTypography.monoMicro)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: ASSpacing.sm) {
+                    Text("Brightness")
+                        .font(ASTypography.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 72, alignment: .leading)
+                    Slider(value: $viewModel.brightnessAdjustment, in: -0.2...0.25, step: 0.01)
+                    Text(String(format: "%.2f", viewModel.brightnessAdjustment))
+                        .font(ASTypography.monoMicro)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, alignment: .trailing)
+                }
+
+                HStack(spacing: ASSpacing.sm) {
+                    Text("Contrast")
+                        .font(ASTypography.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 72, alignment: .leading)
+                    Slider(value: $viewModel.contrastAdjustment, in: 0.8...1.8, step: 0.05)
+                    Text(String(format: "%.2f", viewModel.contrastAdjustment))
+                        .font(ASTypography.monoMicro)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, alignment: .trailing)
+                }
+            }
+        }
+        .padding(ASSpacing.lg)
+        .background(readerHUDPanel)
+    }
+
+    private func quickJumpRow(title: String, subtitle: String, accent: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: ASSpacing.sm) {
+                Circle()
+                    .fill(accent)
+                    .frame(width: 8, height: 8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(ASTypography.label)
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(ASTypography.monoMicro)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, ASSpacing.sm)
+            .padding(.vertical, ASSpacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pageSetupOption(title: String, subtitle: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(ASTypography.label)
+                    .foregroundStyle(isActive ? ASColors.accentFallback : .primary)
+                Text(subtitle)
+                    .font(ASTypography.captionSmall)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, ASSpacing.sm)
+            .padding(.vertical, ASSpacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: ASRadius.md, style: .continuous)
+                    .fill(isActive ? ASColors.accentFallback.opacity(0.14) : Color.white.opacity(0.04))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func linkModeButton(title: String, subtitle: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 3) {
@@ -1643,6 +2059,81 @@ public struct ScoreReaderView: View {
         return String(format: "%d:%02d", mins, secs)
     }
 
+    private func binding(for keyPath: WritableKeyPath<NormalizedPageInsets, Double>) -> Binding<Double> {
+        Binding {
+            viewModel.cropInsets[keyPath: keyPath]
+        } set: { newValue in
+            viewModel.cropInsets[keyPath: keyPath] = newValue
+            viewModel.isCropMarginsEnabled = viewModel.cropInsets != .none
+        }
+    }
+
+    private func applyCropPreset(_ preset: NormalizedPageInsets) {
+        viewModel.cropInsets = preset
+        viewModel.isCropMarginsEnabled = preset != .none
+    }
+
+    private func resetPageSetup() {
+        viewModel.isCropMarginsEnabled = false
+        viewModel.cropInsets = .none
+        viewModel.brightnessAdjustment = 0
+        viewModel.contrastAdjustment = 1.0
+        viewModel.pageTurnBehavior = .standard
+    }
+
+    private func navigate(toHotspot hotspot: JumpNavigationEngine.NavigationHotspot) {
+        guard let destination = hotspot.destinationMeasure else { return }
+        navigateToMeasure(destination)
+    }
+
+    private func navigateToMeasure(_ measureNumber: Int) {
+        let pageIndex = estimatedPageIndex(forMeasure: measureNumber)
+        Task { await navigateToPage(pageIndex) }
+    }
+
+    private func navigateToPage(_ pageIndex: Int) async {
+        await viewModel.goToPage(pageIndex)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showingQuickJumpPanel = false
+            showingBookmarksPanel = false
+        }
+        if canBroadcastPageChanges {
+            linkService.sendPageChange(to: pageIndex)
+        }
+    }
+
+    private func estimatedPageIndex(forMeasure measureNumber: Int) -> Int {
+        guard let normalizedScore,
+              let firstPart = normalizedScore.parts.first,
+              let lastMeasure = firstPart.measures.last?.number,
+              lastMeasure > 0,
+              viewModel.pageCount > 0 else {
+            return min(max(0, measureNumber - 1), max(viewModel.pageCount - 1, 0))
+        }
+
+        let progress = Double(max(1, measureNumber) - 1) / Double(max(lastMeasure - 1, 1))
+        return min(max(Int(progress * Double(max(viewModel.pageCount - 1, 0))), 0), max(viewModel.pageCount - 1, 0))
+    }
+
+    private func structuralJumpSubtitle(_ hotspot: JumpNavigationEngine.NavigationHotspot) -> String {
+        guard let destinationMeasure = hotspot.destinationMeasure else {
+            return "Measure \(hotspot.measureNumber)"
+        }
+        let destinationPage = estimatedPageIndex(forMeasure: destinationMeasure) + 1
+        return "Measure \(hotspot.measureNumber) to page \(destinationPage)"
+    }
+
+    private func jumpTypeLabel(_ type: JumpType) -> String {
+        switch type {
+        case .coda: "Coda"
+        case .dalSegno: "Dal Segno"
+        case .daCapo: "Da Capo"
+        case .repeatStart: "Repeat Start"
+        case .repeatEnd: "Repeat End"
+        case .custom: "Jump Link"
+        }
+    }
+
     private func toggleCurrentPageBookmark() {
         if let bookmark = currentPageBookmark {
             removeBookmark(bookmark)
@@ -1675,6 +2166,11 @@ public struct ScoreReaderView: View {
             displayMode: viewModel.displayMode,
             paperTheme: viewModel.paperTheme,
             zoomScale: viewModel.zoomScale,
+            cropInsets: viewModel.cropInsets,
+            isCropMarginsEnabled: viewModel.isCropMarginsEnabled,
+            brightnessAdjustment: viewModel.brightnessAdjustment,
+            contrastAdjustment: viewModel.contrastAdjustment,
+            pageTurnBehavior: viewModel.pageTurnBehavior,
             savedAt: Date()
         )
 
@@ -1691,6 +2187,11 @@ public struct ScoreReaderView: View {
         viewModel.displayMode = session.displayMode
         viewModel.paperTheme = session.paperTheme
         viewModel.zoomScale = session.zoomScale
+        viewModel.cropInsets = session.cropInsets
+        viewModel.isCropMarginsEnabled = session.isCropMarginsEnabled
+        viewModel.brightnessAdjustment = session.brightnessAdjustment
+        viewModel.contrastAdjustment = session.contrastAdjustment
+        viewModel.pageTurnBehavior = session.pageTurnBehavior
 
         guard viewModel.pageCount > 0 else { return }
         await viewModel.goToPage(min(session.pageIndex, viewModel.pageCount - 1))
@@ -1718,5 +2219,61 @@ private struct ReaderSessionState: Codable {
     let displayMode: DisplayMode
     let paperTheme: PaperTheme
     let zoomScale: Double
+    let cropInsets: NormalizedPageInsets
+    let isCropMarginsEnabled: Bool
+    let brightnessAdjustment: Double
+    let contrastAdjustment: Double
+    let pageTurnBehavior: PageTurnBehavior
     let savedAt: Date
+
+    init(
+        pageIndex: Int,
+        displayMode: DisplayMode,
+        paperTheme: PaperTheme,
+        zoomScale: Double,
+        cropInsets: NormalizedPageInsets,
+        isCropMarginsEnabled: Bool,
+        brightnessAdjustment: Double,
+        contrastAdjustment: Double,
+        pageTurnBehavior: PageTurnBehavior,
+        savedAt: Date
+    ) {
+        self.pageIndex = pageIndex
+        self.displayMode = displayMode
+        self.paperTheme = paperTheme
+        self.zoomScale = zoomScale
+        self.cropInsets = cropInsets
+        self.isCropMarginsEnabled = isCropMarginsEnabled
+        self.brightnessAdjustment = brightnessAdjustment
+        self.contrastAdjustment = contrastAdjustment
+        self.pageTurnBehavior = pageTurnBehavior
+        self.savedAt = savedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case pageIndex
+        case displayMode
+        case paperTheme
+        case zoomScale
+        case cropInsets
+        case isCropMarginsEnabled
+        case brightnessAdjustment
+        case contrastAdjustment
+        case pageTurnBehavior
+        case savedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        pageIndex = try container.decodeIfPresent(Int.self, forKey: .pageIndex) ?? 0
+        displayMode = try container.decodeIfPresent(DisplayMode.self, forKey: .displayMode) ?? .singlePage
+        paperTheme = try container.decodeIfPresent(PaperTheme.self, forKey: .paperTheme) ?? .light
+        zoomScale = try container.decodeIfPresent(Double.self, forKey: .zoomScale) ?? 1.0
+        cropInsets = try container.decodeIfPresent(NormalizedPageInsets.self, forKey: .cropInsets) ?? .none
+        isCropMarginsEnabled = try container.decodeIfPresent(Bool.self, forKey: .isCropMarginsEnabled) ?? false
+        brightnessAdjustment = try container.decodeIfPresent(Double.self, forKey: .brightnessAdjustment) ?? 0
+        contrastAdjustment = try container.decodeIfPresent(Double.self, forKey: .contrastAdjustment) ?? 1.0
+        pageTurnBehavior = try container.decodeIfPresent(PageTurnBehavior.self, forKey: .pageTurnBehavior) ?? .standard
+        savedAt = try container.decodeIfPresent(Date.self, forKey: .savedAt) ?? .now
+    }
 }

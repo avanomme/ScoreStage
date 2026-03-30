@@ -101,3 +101,24 @@ Append short session notes here (what changed, why, next steps).
 
 **Next steps:**
 - Begin Phase 3: Structured Notation Playback
+
+---
+
+## 2026-03-30 — Post-MVP Parity Matrix Established
+
+**What changed:**
+- Added [parity-matrix.md](/Users/adam/projects/ScoreStage/docs/internal/parity-matrix.md) to define the execution path from current state to practical parity with forScore and MobileSheets
+- Reframed delivery into 7 sequential sprints focused on musician workflows instead of broad historical phases
+- Defined a strict command contract for `Complete next Sprint` so sprint completion means functional completeness, verification, git commit, and readiness for the next sprint
+- Captured current status by capability (`done` / `partial` / `missing`) across:
+  - reader / navigation / performance
+  - annotation / markup
+  - setlists / live show tools
+  - library / import / metadata
+  - sync / backup / export / share
+  - pedals / MIDI / Bluetooth / external control
+  - stabilization / QA / commercial readiness
+
+**Next steps:**
+- Start Sprint 1 from the parity matrix
+- Use `Complete next Sprint` as the execution command for each sprint in sequence
