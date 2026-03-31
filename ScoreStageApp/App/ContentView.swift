@@ -61,6 +61,7 @@ enum LibrarySidebarItem: String, CaseIterable, Identifiable, Hashable {
 }
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedItem: LibrarySidebarItem? = .library
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var openedScore: Score?
@@ -73,29 +74,36 @@ struct ContentView: View {
     private let importService = ScoreImportService()
 
     var body: some View {
-        if let score = openedScore, let url = openedFileURL {
-            // Full-window reader — takes over entire window like a music book
-            ScoreReaderView(
-                        score: score,
-                        fileURL: url,
-                        musicXMLURL: openedMusicXMLURL,
-                        onClose: closeScore,
-                        setlistItems: openedSetlistItems,
-                        currentSetlistIndex: openedSetlistIndex,
-                        onNavigateSetlist: navigateSetlistItem
-                    )
-                .transition(.move(edge: .trailing))
-        } else {
-            #if os(iOS)
-            if horizontalSizeClass == .compact {
-                compactLayout
+        Group {
+            if let score = openedScore, let url = openedFileURL {
+                // Full-window reader — takes over entire window like a music book
+                ScoreReaderView(
+                            score: score,
+                            fileURL: url,
+                            musicXMLURL: openedMusicXMLURL,
+                            onClose: closeScore,
+                            setlistItems: openedSetlistItems,
+                            currentSetlistIndex: openedSetlistIndex,
+                            onNavigateSetlist: navigateSetlistItem
+                        )
+                    .transition(.move(edge: .trailing))
             } else {
+                #if os(iOS)
+                if horizontalSizeClass == .compact {
+                    compactLayout
+                } else {
+                    sidebarLayout
+                }
+                #else
                 sidebarLayout
+                #endif
             }
-            #else
-            sidebarLayout
-            #endif
         }
+        .onAppear(perform: seedOwnerAdminIfNeeded)
+    }
+
+    private func seedOwnerAdminIfNeeded() {
+        _ = AccountBootstrap.seedOwnerAccount(in: modelContext)
     }
 
     // MARK: - Sidebar Layout (iPad / macOS)

@@ -2,8 +2,9 @@
 
 import Foundation
 import StoreKit
+import CoreDomain
 
-/// Manages ScoreStage Pro unlock and optional cloud subscription via StoreKit 2.
+/// Maintains feature access based on account role and optional subscription state.
 @MainActor
 @Observable
 public final class StoreService {
@@ -20,10 +21,10 @@ public final class StoreService {
 
     // MARK: - Public State
 
-    /// Whether the user has Pro access (lifetime or active subscription).
+    /// Whether the current signed-in account has full access.
     public private(set) var isPro: Bool = false
 
-    /// Current subscription status description.
+    /// Current access status description.
     public private(set) var subscriptionStatus: String = "Free"
 
     /// Available products for purchase.
@@ -38,127 +39,37 @@ public final class StoreService {
     /// Whether products have been loaded.
     public private(set) var isLoaded: Bool = false
 
-    // MARK: - Private
-
-    private nonisolated(unsafe) var updateListenerTask: Task<Void, Never>?
-
     public init() {
-        updateListenerTask = listenForTransactions()
-        Task {
-            await loadProducts()
-            await updatePurchaseStatus()
-        }
-    }
-
-    deinit {
-        updateListenerTask?.cancel()
+        isLoaded = true
+        applyRoleAccess()
     }
 
     // MARK: - Load Products
 
     public func loadProducts() async {
-        do {
-            let storeProducts = try await Product.products(for: ProductID.all)
-            // Sort: monthly, yearly, lifetime
-            products = storeProducts.sorted { a, b in
-                let order = [ProductID.proMonthly, ProductID.proYearly, ProductID.proLifetime]
-                let ai = order.firstIndex(of: a.id) ?? 99
-                let bi = order.firstIndex(of: b.id) ?? 99
-                return ai < bi
-            }
-            isLoaded = true
-        } catch {
-            errorMessage = "Unable to load products."
-            isLoaded = true
-        }
+        products = []
+        isLoaded = true
+        errorMessage = nil
     }
 
     // MARK: - Purchase
 
     public func purchase(_ product: Product) async {
-        isPurchasing = true
-        errorMessage = nil
-
-        do {
-            let result = try await product.purchase()
-
-            switch result {
-            case .success(let verification):
-                let transaction = try checkVerified(verification)
-                await transaction.finish()
-                await updatePurchaseStatus()
-
-            case .userCancelled:
-                break
-
-            case .pending:
-                subscriptionStatus = "Purchase pending"
-
-            @unknown default:
-                break
-            }
-        } catch {
-            errorMessage = "Purchase failed: \(error.localizedDescription)"
-        }
-
+        _ = product
         isPurchasing = false
+        errorMessage = nil
     }
 
     // MARK: - Restore
 
     public func restorePurchases() async {
-        try? await AppStore.sync()
-        await updatePurchaseStatus()
+        applyRoleAccess()
     }
 
     // MARK: - Status
 
     public func updatePurchaseStatus() async {
-        var hasProAccess = false
-
-        for await result in Transaction.currentEntitlements {
-            guard let transaction = try? checkVerified(result) else { continue }
-
-            if ProductID.all.contains(transaction.productID) {
-                if transaction.revocationDate == nil {
-                    hasProAccess = true
-
-                    if transaction.productID == ProductID.proLifetime {
-                        subscriptionStatus = "Pro (Lifetime)"
-                    } else if transaction.productID == ProductID.proYearly {
-                        if let expirationDate = transaction.expirationDate {
-                            subscriptionStatus = "Pro (Yearly) — renews \(expirationDate.formatted(.dateTime.month().day()))"
-                        } else {
-                            subscriptionStatus = "Pro (Yearly)"
-                        }
-                    } else if transaction.productID == ProductID.proMonthly {
-                        if let expirationDate = transaction.expirationDate {
-                            subscriptionStatus = "Pro (Monthly) — renews \(expirationDate.formatted(.dateTime.month().day()))"
-                        } else {
-                            subscriptionStatus = "Pro (Monthly)"
-                        }
-                    }
-                }
-            }
-        }
-
-        isPro = hasProAccess
-        if !hasProAccess {
-            subscriptionStatus = "Free"
-        }
-    }
-
-    // MARK: - Transaction Listener
-
-    private func listenForTransactions() -> Task<Void, Never> {
-        Task.detached { [weak self] in
-            for await result in Transaction.updates {
-                guard let self else { return }
-                if let _ = try? self.checkVerified(result) {
-                    await self.updatePurchaseStatus()
-                }
-            }
-        }
+        applyRoleAccess()
     }
 
     private nonisolated func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
@@ -178,8 +89,22 @@ public final class StoreService {
 
     /// Check if a feature requires Pro. Returns true if accessible.
     public func canAccess(feature: ProFeature) -> Bool {
-        if isPro { return true }
-        return feature.isFree
+        AccountAuthorization.canAccess(
+            feature: feature,
+            role: AccountAuthorization.activeRole(),
+            hasSubscription: isPro
+        )
+    }
+
+    private func applyRoleAccess() {
+        let role = AccountAuthorization.activeRole()
+        if role.grantsFullAccess {
+            isPro = true
+            subscriptionStatus = "\(role.displayName) Access"
+        } else {
+            isPro = false
+            subscriptionStatus = "Free"
+        }
     }
 }
 

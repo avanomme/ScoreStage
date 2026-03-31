@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import CoreDomain
 import DesignSystem
 import SyncFeature
@@ -8,6 +9,9 @@ import InputTrackingFeature
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \AdminAccount.createdAt) private var adminAccounts: [AdminAccount]
+    @AppStorage(AccountSessionStorage.usernameKey) private var activeAccountUsername = ""
+    @AppStorage(AccountSessionStorage.roleKey) private var activeAccountRole = AccountRole.user.rawValue
     @AppStorage("defaultDisplayMode") private var defaultDisplayMode = "singlePage"
     @AppStorage("defaultPaperTheme") private var defaultPaperTheme = "light"
     @AppStorage("tapZoneWidth") private var tapZoneWidth = 0.5
@@ -17,28 +21,87 @@ struct SettingsView: View {
     @State private var backupService: BackupRestoreService?
     @State private var backupMessage: String?
     @State private var showingBackupImporter = false
+    @State private var showingAdminConsole = false
     @State private var restoreStrategy: BackupRestoreService.RestoreStrategy = .merge
     @State private var externalControlProfile = ExternalControlProfile.stageDefault
-    @State private var storeService = StoreService()
     @State private var analyticsService = AnalyticsService()
-    @State private var showingPaywall = false
+    @State private var storeService = StoreService()
 
     var body: some View {
         Form {
-            Section("Subscription") {
+            Section("Access") {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(storeService.isPro ? "ScoreStage Pro Active" : "Free Library")
+                        Text("Active Account: \(activeAccountUsername.isEmpty ? AccountBootstrap.ownerUsername : activeAccountUsername)")
                             .font(ASTypography.body)
-                        Text(storeService.subscriptionStatus)
+                        Text("\((AccountRole(rawValue: activeAccountRole) ?? .user).displayName) role. \(storeService.subscriptionStatus) through role-based authorization.")
                             .font(ASTypography.caption)
                             .foregroundStyle(.secondary)
                     }
-
                     Spacer()
+                    Button(activeAccountUsername.isEmpty ? "Sign In" : "Sign Out") {
+                        if activeAccountUsername.isEmpty {
+                            seedOwnerAccount()
+                        } else {
+                            AccountAuthorization.clearActiveAccount()
+                            Task { await storeService.updatePurchaseStatus() }
+                        }
+                    }
+                }
+            }
 
-                    Button(storeService.isPro ? "Manage" : "Upgrade") {
-                        showingPaywall = true
+            Section("Admin Accounts") {
+                if adminAccounts.isEmpty {
+                    Text("No admin accounts found.")
+                        .font(ASTypography.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button("Create Owner Account") {
+                        seedOwnerAccount()
+                    }
+                } else {
+                    ForEach(adminAccounts, id: \.persistentModelID) { account in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(account.username)
+                                    .font(ASTypography.body)
+                                Spacer()
+                                Text(account.role.displayName)
+                                    .font(ASTypography.caption)
+                                    .foregroundStyle(ASColors.accentFallback)
+                            }
+
+                            Text(account.isActive ? "Active account" : "Inactive account")
+                                .font(ASTypography.caption)
+                                .foregroundStyle(.secondary)
+
+                            if account.role == .owner {
+                                Text("Seeded owner account. Full access is granted by role and exempt from paywall restrictions.")
+                                    .font(ASTypography.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+
+            if (AccountRole(rawValue: activeAccountRole) ?? .user).grantsFullAccess {
+                Section("Admin Panel") {
+                    Text("Owner and admin roles can reach protected features directly through the application interface. Authorization is granted by role, not by UI-only overrides.")
+                        .font(ASTypography.caption)
+                        .foregroundStyle(.secondary)
+
+                    statusRow("Session Role", value: (AccountRole(rawValue: activeAccountRole) ?? .user).displayName)
+                    statusRow("Paywall Policy", value: "Bypassed by role")
+                    statusRow("Bootstrap Owner", value: AccountBootstrap.ownerUsername)
+
+                    Button("Refresh Authorization State") {
+                        Task { await storeService.updatePurchaseStatus() }
+                    }
+
+                    Button("Open Admin Console") {
+                        showingAdminConsole = true
                     }
                 }
             }
@@ -249,10 +312,8 @@ struct SettingsView: View {
             }
             syncService.isEnabled = isSyncEnabled
             loadExternalControlProfile()
-            if !storeService.isLoaded {
-                await storeService.loadProducts()
-                await storeService.updatePurchaseStatus()
-            }
+            seedOwnerAccount()
+            await storeService.updatePurchaseStatus()
         }
         .onChange(of: isSyncEnabled) { _, newValue in
             syncService.isEnabled = newValue
@@ -278,8 +339,40 @@ struct SettingsView: View {
                 Text(backupMessage)
             }
         }
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView(storeService: storeService)
+        .sheet(isPresented: $showingAdminConsole) {
+            AdminConsoleView(
+                activeUsername: activeAccountUsername.isEmpty ? AccountBootstrap.ownerUsername : activeAccountUsername,
+                activeRole: AccountRole(rawValue: activeAccountRole) ?? .user,
+                ownerAccount: adminAccounts.first(where: { $0.role == .owner }),
+                subscriptionStatus: storeService.subscriptionStatus,
+                syncEnabled: isSyncEnabled,
+                syncStatusDescription: syncService.statusDescription,
+                syncConflictCount: syncService.pendingConflicts.count,
+                backupStatusDescription: backupService.map { backupStatusText(for: $0.state) } ?? "Checking",
+                externalControlProfile: externalControlProfile,
+                featureAudit: ProFeature.allCases.map { AdminFeatureAudit(feature: $0, isAccessible: storeService.canAccess(feature: $0)) },
+                onRefreshAuthorization: {
+                    Task { await storeService.updatePurchaseStatus() }
+                },
+                onReseedOwner: {
+                    seedOwnerAccount()
+                },
+                onRunSync: {
+                    Task {
+                        syncService.isEnabled = isSyncEnabled
+                        await syncService.syncNow(modelContext: modelContext)
+                    }
+                },
+                onCreateRestorePoint: {
+                    Task { await createRestorePoint() }
+                },
+                onSignOut: {
+                    AccountAuthorization.clearActiveAccount()
+                    Task { await storeService.updatePurchaseStatus() }
+                    showingAdminConsole = false
+                }
+            )
+            .frame(minWidth: 700, minHeight: 700)
         }
         #if os(macOS)
         .formStyle(.grouped)
@@ -349,6 +442,10 @@ struct SettingsView: View {
             return
         }
         externalControlProfile = profile
+    }
+
+    private func seedOwnerAccount() {
+        _ = AccountBootstrap.seedOwnerAccount(in: modelContext)
     }
 
     private func saveExternalControlProfile() {

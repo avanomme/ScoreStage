@@ -10,15 +10,19 @@
 		068D5A3BBC10A328C1E1CA5D /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = F4D4AD4C54CC98827868B451 /* CoreDomain */; };
 		19B892337E1F966B6F382455 /* AnnotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = ADA971AFC20E7F8205BD14EC /* AnnotationFeature */; };
 		1AAC0BB093B3D376E76D2405 /* SyncFeature in Frameworks */ = {isa = PBXBuildFile; productRef = E107029463CF13117DAE64C0 /* SyncFeature */; };
+		23899A3D9AE123B256586333 /* AdminConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7185FD5608F6FEB450BF2F5A /* AdminConsoleView.swift */; };
 		3523EB753652F366CECD5EFF /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */; };
 		368898ACA98B752A9AF8ECF9 /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 3B36979412553F7CBC240F62 /* CoreDomain */; };
 		3A9322074186841C69B46367 /* ScoreStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCD611DDE4919AD924DC042 /* ScoreStageTests.swift */; };
 		3AC9980BA25ABD095CF9DF19 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2CE0C68291BE92C252BCD1 /* SettingsView.swift */; };
 		423580C68836CC111D590B4C /* ScoreStageApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F24DE759136043B296DC774 /* ScoreStageApp.swift */; };
+		454CABF06BA43B1F831D91CC /* AccountAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48FA19296652CF24BC2FB4E /* AccountAccess.swift */; };
+		4B325C1B2B39C213E7EB38E4 /* AccountAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48FA19296652CF24BC2FB4E /* AccountAccess.swift */; };
 		577CB981D77F2397B996C260 /* SyncFeature in Frameworks */ = {isa = PBXBuildFile; productRef = ADB558F2B29A153233576609 /* SyncFeature */; };
 		5CDEA5E8E0FDC04DC7076AE7 /* ScoreStageApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F24DE759136043B296DC774 /* ScoreStageApp.swift */; };
 		5F9E9AA68A3CDFF6ECC5F3FE /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = B31F5C39D978E876782944C8 /* SetlistFeature */; };
 		639671C2C5CBB6E3207A2984 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC890328F2B3C396AC4214D4 /* ContentView.swift */; };
+		64D7185B1C7A92B3E680F40F /* AccountLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4DFE7BBF5C5B675FB8619F /* AccountLoginView.swift */; };
 		6589CD666E49A314E928BB5D /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = CDB76905AC76C08AE55CE1E0 /* SetlistFeature */; };
 		680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */; };
 		6B9984F176BE980F4304A1D7 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 718BCE056C508C1B5C9D5B03 /* LibraryFeature */; };
@@ -38,6 +42,7 @@
 		A618E7E57AFED287F7969AD5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC890328F2B3C396AC4214D4 /* ContentView.swift */; };
 		A820835933EC74564333976A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2CE0C68291BE92C252BCD1 /* SettingsView.swift */; };
 		A988488F2E8F0AF5C383F889 /* NotationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 08DB180B3ED16EB27BD7C3A4 /* NotationFeature */; };
+		AB5DD579F19C852562E31210 /* AdminConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7185FD5608F6FEB450BF2F5A /* AdminConsoleView.swift */; };
 		ABDBC146EB33F2F5B0528C76 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E5B7285B9693CCD387E6BCE /* Assets.xcassets */; };
 		B6F0E04A2E31012653BA74D8 /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = D52AEF3DD4DE89184F54EEB6 /* InputTrackingFeature */; };
 		BDD95AC299CB38CD0737BA16 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = E4D945420D309B3E964B3063 /* DesignSystem */; };
@@ -45,6 +50,7 @@
 		C64445B0A4903C7455C2F876 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C19E309A510733E25407B27 /* AnalyticsService.swift */; };
 		DEC8FCE83B1354BFE7A116F9 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C19E309A510733E25407B27 /* AnalyticsService.swift */; };
 		E715E7F5DAFF9B3E6D7E2A7A /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 14C5834787FBEEE864C16EA9 /* InputTrackingFeature */; };
+		F818650B2E684C3855318DA3 /* AccountLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4DFE7BBF5C5B675FB8619F /* AccountLoginView.swift */; };
 		F8C735DA53DFFF6D94B3088A /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C803733B8F4FAEAF47BCDF97 /* CoreDomain */; };
 		FF36CD4677D93A159FC09564 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */; };
 /* End PBXBuildFile section */
@@ -71,6 +77,7 @@
 		61B85467299C5F689456F8FF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		6BCAF7B0338AE4B042F36DB4 /* NotationFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NotationFeature; path = Packages/NotationFeature; sourceTree = SOURCE_ROOT; };
+		7185FD5608F6FEB450BF2F5A /* AdminConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminConsoleView.swift; sourceTree = "<group>"; };
 		72B28B8A823D4F1B1D42F76A /* ScoreStageTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ScoreStageTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7887802C0F7C31F1DAC8C998 /* DesignSystem */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DesignSystem; path = Packages/DesignSystem; sourceTree = SOURCE_ROOT; };
 		79B9848EF4887B64CE0C1FB0 /* AnnotationFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AnnotationFeature; path = Packages/AnnotationFeature; sourceTree = SOURCE_ROOT; };
@@ -84,7 +91,9 @@
 		C0C5CC5F8CF6FF758798936E /* SyncFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SyncFeature; path = Packages/SyncFeature; sourceTree = SOURCE_ROOT; };
 		CBCD611DDE4919AD924DC042 /* ScoreStageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreStageTests.swift; sourceTree = "<group>"; };
 		CC890328F2B3C396AC4214D4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		DA4DFE7BBF5C5B675FB8619F /* AccountLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLoginView.swift; sourceTree = "<group>"; };
 		E847184B521DA24569D7469A /* CoreDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreDomain; path = Packages/CoreDomain; sourceTree = SOURCE_ROOT; };
+		F48FA19296652CF24BC2FB4E /* AccountAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountAccess.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,6 +166,9 @@
 		36583FFEAD7D29918B5A65C6 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				F48FA19296652CF24BC2FB4E /* AccountAccess.swift */,
+				DA4DFE7BBF5C5B675FB8619F /* AccountLoginView.swift */,
+				7185FD5608F6FEB450BF2F5A /* AdminConsoleView.swift */,
 				8C19E309A510733E25407B27 /* AnalyticsService.swift */,
 				CC890328F2B3C396AC4214D4 /* ContentView.swift */,
 				61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */,
@@ -378,6 +390,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4B325C1B2B39C213E7EB38E4 /* AccountAccess.swift in Sources */,
+				F818650B2E684C3855318DA3 /* AccountLoginView.swift in Sources */,
+				23899A3D9AE123B256586333 /* AdminConsoleView.swift in Sources */,
 				DEC8FCE83B1354BFE7A116F9 /* AnalyticsService.swift in Sources */,
 				639671C2C5CBB6E3207A2984 /* ContentView.swift in Sources */,
 				3523EB753652F366CECD5EFF /* OnboardingView.swift in Sources */,
@@ -392,6 +407,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				454CABF06BA43B1F831D91CC /* AccountAccess.swift in Sources */,
+				64D7185B1C7A92B3E680F40F /* AccountLoginView.swift in Sources */,
+				AB5DD579F19C852562E31210 /* AdminConsoleView.swift in Sources */,
 				C64445B0A4903C7455C2F876 /* AnalyticsService.swift in Sources */,
 				A618E7E57AFED287F7969AD5 /* ContentView.swift in Sources */,
 				680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */,

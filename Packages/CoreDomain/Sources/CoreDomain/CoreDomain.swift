@@ -6,6 +6,7 @@ import SwiftData
 
 /// All SwiftData model types used in the app's ModelContainer.
 public let allModelTypes: [any PersistentModel.Type] = [
+    AdminAccount.self,
     Score.self,
     ScoreAsset.self,
     AnnotationLayer.self,

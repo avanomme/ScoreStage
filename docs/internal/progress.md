@@ -4,6 +4,45 @@ Append short session notes here (what changed, why, next steps).
 
 ---
 
+## 2026-03-31 — Owner/Admin Account Chain Completed
+
+**What changed:**
+- Added a first-class `AdminAccount` model and `AccountRole` enum for `owner`, `admin`, and `user`
+- Seeded the permanent owner account through bootstrap using the real password hashing flow instead of a UI-only unlock
+- Added a normal sign-in surface so the seeded owner account can authenticate through the application interface
+- Wired session state through `AppStorage` so the active account and role drive authorization and UI visibility
+- Updated feature gating so owner/admin roles always receive protected features through the authorization layer, including paywall-exempt access
+- Added owner/admin surfaces in Settings and a real sign-out path so the full account chain is reachable and testable through the UI
+- Documented the architecture in [account-architecture.md](/Users/adam/projects/ScoreStage/docs/internal/account-architecture.md)
+
+**Verification:**
+- `swift test` in `Packages/CoreDomain`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Expand the admin surface beyond Settings into a dedicated operational panel when account management and support tooling are added
+- Execute the post-parity backlog from [post-parity-backlog.md](/Users/adam/projects/ScoreStage/docs/internal/post-parity-backlog.md)
+
+---
+
+## 2026-03-31 — Post-Parity Backlog: Admin Console + Release Validation
+
+**What changed:**
+- Added a dedicated in-app admin console for owner/admin sessions with session diagnostics, feature-gate audits, sync/backup status, and operational actions
+- Wired Settings to open that admin console so the remaining backlog can be worked from a visible internal control surface instead of scattered status text
+- Added [release-validation-checklist.md](/Users/adam/projects/ScoreStage/docs/internal/release-validation-checklist.md) to turn the remaining post-parity work into explicit closure items with evidence targets
+- Updated the post-parity backlog notes to reflect that admin surfaces now exist and the remaining gap is validation, not missing control access
+
+**Verification:**
+- `swift test` in `Packages/CoreDomain`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Use the admin console and release checklist to close the remaining verification-heavy backlog items in order
+- Prioritize real-device reader and linked-device validation next
+
+---
+
 ## 2026-03-13 — Bootstrap: Task Generation
 
 **What changed:**
@@ -251,6 +290,36 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - All currently defined parity-matrix sprints are complete
 - The next phase should be a fresh backlog pass for remaining competitive gaps, deeper QA, and App Store submission assets/review prep
+
+---
+
+## 2026-03-31 — Post-Parity Backlog Opened
+
+**What changed:**
+- Added [post-parity-backlog.md](/Users/adam/projects/ScoreStage/docs/internal/post-parity-backlog.md) to capture the work that still needs explicit closure after the parity sprint sequence
+- Separated remaining work into release blockers, claimed-feature validation, product hardening, and commercial/operations packaging so "parity complete" does not get mistaken for "ship complete"
+- Flagged high-risk areas that still need confirmation despite broad feature coverage, including head/eye tracking validation, score-following workflow closure, Handoff exposure, StoreKit production checks, cloud failure-path testing, and real-device linked-session soak testing
+
+**Next steps:**
+- Work through the backlog in order, starting with release blockers and claimed-feature validation
+- Keep marketing/paywall/App Store copy aligned with only the features that have passed release validation
+
+---
+
+## 2026-03-31 — Owner/Admin Account Architecture Added
+
+**What changed:**
+- Added a first-class account model with explicit `owner`, `admin`, and `user` roles in [AdminAccount.swift](/Users/adam/projects/ScoreStage/Packages/CoreDomain/Sources/CoreDomain/Models/AdminAccount.swift)
+- Added bootstrap/auth/session support in [AccountAccess.swift](/Users/adam/projects/ScoreStage/ScoreStageApp/App/AccountAccess.swift), including seeded owner-account creation and hashed password storage flow
+- Added a normal sign-in UI in [AccountLoginView.swift](/Users/adam/projects/ScoreStage/ScoreStageApp/App/AccountLoginView.swift) so the seeded owner account is usable through the app interface
+- Seeded the permanent owner account `offbyone` through app bootstrap in [ContentView.swift](/Users/adam/projects/ScoreStage/ScoreStageApp/App/ContentView.swift)
+- Updated role-based authorization in [StoreService.swift](/Users/adam/projects/ScoreStage/ScoreStageApp/App/StoreService.swift) so `owner` and `admin` roles get full access through authorization policy rather than UI gating
+- Surfaced the active role, seeded accounts, and admin panel status in [SettingsView.swift](/Users/adam/projects/ScoreStage/ScoreStageApp/App/SettingsView.swift)
+- Documented the architecture and owner/paywall relationship in [account-architecture.md](/Users/adam/projects/ScoreStage/docs/internal/account-architecture.md)
+
+**Next steps:**
+- Add a real sign-in/account-management UI when account workflows are expanded beyond the seeded owner role
+- Build future admin tooling on top of the seeded owner/admin role system instead of introducing parallel override paths
 
 **Next steps:**
 - Start Sprint 7 from the parity matrix

@@ -8,8 +8,6 @@ import DesignSystem
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var currentPage = 0
-    @State private var showingPaywall = false
-    @State private var storeService = StoreService()
 
     let onComplete: () -> Void
 
@@ -82,19 +80,12 @@ struct OnboardingView: View {
                 // Actions
                 VStack(spacing: ASSpacing.md) {
                     if currentPage == pages.count - 1 {
-                        PremiumButton("Start Free Library", icon: "arrow.right", style: .primary) {
-                            completeOnboarding(trackProIntent: false)
+                        PremiumButton("Open Library", icon: "arrow.right", style: .primary) {
+                            completeOnboarding()
                         }
                         .largeTapTarget()
-                        .accessibilityLabel("Start free library")
+                        .accessibilityLabel("Open library")
                         .accessibilityHint("Finish onboarding and open your library.")
-
-                        PremiumButton("Explore Pro", icon: "star.circle", style: .secondary) {
-                            showingPaywall = true
-                        }
-                        .largeTapTarget()
-                        .accessibilityLabel("Explore ScoreStage Pro")
-                        .accessibilityHint("Review paid features and subscription options.")
                     } else {
                         PremiumButton("Continue", style: .primary) {
                             withAnimation {
@@ -107,7 +98,7 @@ struct OnboardingView: View {
 
                     if currentPage < pages.count - 1 {
                         Button("Skip") {
-                            completeOnboarding(trackProIntent: false)
+                            completeOnboarding()
                         }
                         .font(ASTypography.bodySmall)
                         .foregroundStyle(.secondary)
@@ -118,9 +109,6 @@ struct OnboardingView: View {
                 .padding(.horizontal, ASSpacing.xl)
                 .padding(.bottom, ASSpacing.xxxl)
             }
-        }
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView(storeService: storeService)
         }
     }
 
@@ -148,15 +136,15 @@ struct OnboardingView: View {
 
             if currentPage == pages.count - 1 {
                 VStack(alignment: .leading, spacing: ASSpacing.sm) {
-                    onboardingChecklistRow(title: "Import up to 5 scores free", icon: "checkmark.circle.fill")
-                    onboardingChecklistRow(title: "Upgrade later for unlimited library, sync, and playback tools", icon: "star.circle.fill")
+                    onboardingChecklistRow(title: "Import your full library with no score limit", icon: "checkmark.circle.fill")
+                    onboardingChecklistRow(title: "Use playback, sync, linked devices, and practice tools immediately", icon: "star.circle.fill")
                     onboardingChecklistRow(title: "Your annotations, setlists, and backups stay on-device by default", icon: "lock.shield.fill")
                 }
                 .padding(ASSpacing.lg)
                 .background(ASColors.chromeSurfaceElevated)
                 .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
                 .frame(maxWidth: 420)
-                .accessibleCard("Onboarding checklist. Import five scores free. Upgrade later for unlimited library, sync and playback tools. Data stays on device by default.", hint: "Summary of the free and pro experience.")
+                .accessibleCard("Onboarding checklist. Import your full library, use playback sync and linked devices immediately, and keep data on device by default.", hint: "Summary of the app experience.")
             }
         }
         .padding(.horizontal, ASSpacing.xl)
@@ -173,11 +161,8 @@ struct OnboardingView: View {
         }
     }
 
-    private func completeOnboarding(trackProIntent: Bool) {
+    private func completeOnboarding() {
         hasCompletedOnboarding = true
-        if trackProIntent {
-            UserDefaults.standard.set(true, forKey: "hasSeenPaywallFromOnboarding")
-        }
         onComplete()
     }
 }

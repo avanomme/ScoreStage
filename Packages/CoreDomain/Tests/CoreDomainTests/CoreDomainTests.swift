@@ -32,7 +32,18 @@ final class CoreDomainTests: XCTestCase {
     }
 
     func testAllModelTypesPopulated() {
-        XCTAssertEqual(allModelTypes.count, 14)
+        XCTAssertEqual(allModelTypes.count, 15)
+    }
+
+    func testAdminAccountCreation() {
+        let account = AdminAccount(username: "offbyone")
+
+        XCTAssertEqual(account.username, "offbyone")
+        XCTAssertEqual(account.role, .owner)
+        XCTAssertTrue(account.isActive)
+        XCTAssertTrue(account.requiresPasswordSetup)
+        XCTAssertEqual(account.passwordSaltBase64, "")
+        XCTAssertEqual(account.passwordHashBase64, "")
     }
 
     func testExternalControlProfileDefaults() {
