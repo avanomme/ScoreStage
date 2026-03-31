@@ -204,3 +204,26 @@ Append short session notes here (what changed, why, next steps).
 **Next steps:**
 - Start Sprint 6 from the parity matrix
 - Focus on pedal support, MIDI mapping, Bluetooth/external control, and live-performance hardware reliability
+
+---
+
+## 2026-03-31 — Sprint 6 Complete: Pedals / MIDI / Bluetooth / External Control
+
+**What changed:**
+- Added a shared external-control profile model covering keyboard, pedal, and MIDI mappings, plus linked-session propagation rules, so control behavior is configurable instead of hardcoded
+- Reworked page-turn routing into an action-aware control service that can map keyboard keys, Bluetooth pedal roles, and MIDI events into reader, playback, setlist, and lock actions
+- Added Bluetooth pedal monitoring through Game Controller input, which covers common pedal-style HID/controller hardware while keyboard-emulating pedals continue to work through configurable key mappings
+- Extended MIDI input handling to emit note and control-change events for live control mapping in addition to the existing score-following/practice note tracking
+- Integrated external controls directly into the reader with live status badges, an in-reader control panel, configurable command handling for page turns/playback/setlist navigation, and linked-device command propagation for shared performance actions
+- Expanded Settings with real external-control configuration for pedal actions, keyboard actions, MIDI mappings, and linked-session propagation behavior
+
+**Verification:**
+- `swift build` in `Packages/CoreDomain`
+- `swift build` in `Packages/InputTrackingFeature`
+- `swift build` in `Packages/PlaybackFeature`
+- `swift build` in `Packages/ReaderFeature`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- Start Sprint 7 from the parity matrix
+- Focus on stabilization, QA coverage, commercial polish, accessibility, and store-readiness

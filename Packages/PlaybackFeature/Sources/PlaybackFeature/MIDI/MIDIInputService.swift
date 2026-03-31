@@ -10,6 +10,11 @@ import NotationFeature
 @MainActor
 @Observable
 public final class MIDIInputService {
+    public enum ControlEvent: Sendable, Equatable {
+        case noteOn(note: Int, velocity: Int, channel: Int)
+        case noteOff(note: Int, channel: Int)
+        case controlChange(controller: Int, value: Int, channel: Int)
+    }
 
     // MARK: - Public State
 
@@ -27,6 +32,9 @@ public final class MIDIInputService {
 
     /// Last played velocity (0-127).
     public private(set) var lastPlayedVelocity: Int?
+
+    /// Last received MIDI control event.
+    public private(set) var lastControlEvent: ControlEvent?
 
     /// Currently held notes (for chord detection).
     public private(set) var activeNotes: Set<Int> = []
@@ -63,6 +71,7 @@ public final class MIDIInputService {
     private var inputPort = MIDIPortRef()
     private var noteOnCallback: ((Int, Int) -> Void)?
     private var noteOffCallback: ((Int) -> Void)?
+    public var onControlEvent: ((ControlEvent) -> Void)?
 
     public init() {}
 
@@ -70,6 +79,9 @@ public final class MIDIInputService {
 
     /// Start listening for MIDI input from all available sources.
     public func start() {
+        if midiClient != 0 || inputPort != 0 {
+            stop()
+        }
         connectionState = .searching
 
         let status = MIDIClientCreateWithBlock("ScoreStage" as CFString, &midiClient) { [weak self] notification in
@@ -103,8 +115,14 @@ public final class MIDIInputService {
 
     /// Stop listening for MIDI input.
     public func stop() {
-        MIDIPortDispose(inputPort)
-        MIDIClientDispose(midiClient)
+        if inputPort != 0 {
+            MIDIPortDispose(inputPort)
+            inputPort = 0
+        }
+        if midiClient != 0 {
+            MIDIClientDispose(midiClient)
+            midiClient = 0
+        }
         connectionState = .disconnected
         activeNotes.removeAll()
     }
@@ -168,17 +186,23 @@ public final class MIDIInputService {
                 let data2 = UInt8(firstWord & 0xFF)
 
                 let messageType = status & 0xF0
+                let channel = Int(status & 0x0F)
 
                 Task { @MainActor in
                     switch messageType {
                     case 0x90: // Note On
                         if data2 > 0 {
                             self.handleNoteOn(Int(data1), velocity: Int(data2))
+                            self.recordControlEvent(.noteOn(note: Int(data1), velocity: Int(data2), channel: channel))
                         } else {
                             self.handleNoteOff(Int(data1))
+                            self.recordControlEvent(.noteOff(note: Int(data1), channel: channel))
                         }
                     case 0x80: // Note Off
                         self.handleNoteOff(Int(data1))
+                        self.recordControlEvent(.noteOff(note: Int(data1), channel: channel))
+                    case 0xB0: // Control Change
+                        self.recordControlEvent(.controlChange(controller: Int(data1), value: Int(data2), channel: channel))
                     default:
                         break
                     }
@@ -199,6 +223,11 @@ public final class MIDIInputService {
 
     private func handleNoteOff(_ note: Int) {
         activeNotes.remove(note)
+    }
+
+    private func recordControlEvent(_ event: ControlEvent) {
+        lastControlEvent = event
+        onControlEvent?(event)
     }
 
     private func evaluateMatch() {

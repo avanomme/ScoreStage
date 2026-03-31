@@ -51,11 +51,12 @@ public enum LinkMessage: Codable, Sendable {
     case displayModeChanged(mode: String)
     case roleAssignment(role: String)
     case scoreOpened(scoreID: UUID)
+    case externalCommand(action: String)
     case sessionEnded
     case ping
 
     enum CodingKeys: String, CodingKey {
-        case type, pageIndex, mode, role, scoreID
+        case type, pageIndex, mode, role, scoreID, action
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +71,8 @@ public enum LinkMessage: Codable, Sendable {
             self = .roleAssignment(role: try container.decode(String.self, forKey: .role))
         case "scoreOpened":
             self = .scoreOpened(scoreID: try container.decode(UUID.self, forKey: .scoreID))
+        case "externalCommand":
+            self = .externalCommand(action: try container.decode(String.self, forKey: .action))
         case "sessionEnded":
             self = .sessionEnded
         default:
@@ -92,6 +95,9 @@ public enum LinkMessage: Codable, Sendable {
         case .scoreOpened(let scoreID):
             try container.encode("scoreOpened", forKey: .type)
             try container.encode(scoreID, forKey: .scoreID)
+        case .externalCommand(let action):
+            try container.encode("externalCommand", forKey: .type)
+            try container.encode(action, forKey: .action)
         case .sessionEnded:
             try container.encode("sessionEnded", forKey: .type)
         case .ping:
@@ -220,6 +226,10 @@ public final class DeviceLinkService: NSObject {
         sendMessage(.pageChanged(pageIndex: pageIndex))
     }
 
+    public func sendExternalCommand(_ action: String) {
+        sendMessage(.externalCommand(action: action))
+    }
+
     public func configureLinkedSession(
         displayMode: LinkedDisplayMode,
         localRole: DeviceRole,
@@ -298,6 +308,8 @@ extension DeviceLinkService: MCSessionDelegate {
             }
         case .scoreOpened(let scoreID):
             openedScoreID = scoreID
+        case .externalCommand:
+            break
         case .sessionEnded:
             connectedPeers.removeAll()
             openedScoreID = nil

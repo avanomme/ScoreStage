@@ -6,6 +6,7 @@ import AnnotationFeature
 import PlaybackFeature
 import NotationFeature
 import DeviceLinkFeature
+import InputTrackingFeature
 
 private struct SetlistAdvanceCountdown: Equatable {
     let title: String
@@ -56,6 +57,11 @@ public struct ScoreReaderView: View {
     @State private var showingQuickJumpPanel = false
     @State private var showingPageSetupPanel = false
     @State private var showingExportSheet = false
+    @State private var showingExternalControlsPanel = false
+    @State private var pageTurnService = PageTurnService()
+    @State private var pedalController = PedalControllerService()
+    @State private var midiInputService = MIDIInputService()
+    @AppStorage(ExternalControlProfileStorage.defaultsKey) private var externalControlProfileData = ""
 
     // Setlist navigation
     let setlistItems: [SetListItem]?
@@ -243,6 +249,20 @@ public struct ScoreReaderView: View {
                 }
             }
 
+            if showingExternalControlsPanel && !annotationState.isAnnotating {
+                VStack {
+                    Spacer()
+                    HStack {
+                        externalControlsPanel
+                            .frame(width: 360)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        Spacer()
+                    }
+                    .padding(.leading, ASSpacing.lg)
+                    .padding(.bottom, showingPlayback ? 110 : ASSpacing.screenPadding)
+                }
+            }
+
             if showingSetlistNav && !annotationState.isAnnotating {
                 VStack {
                     Spacer()
@@ -338,6 +358,7 @@ public struct ScoreReaderView: View {
             loadAnnotations()
             setupAnnotationCallbacks()
             configureDeviceLink()
+            configureExternalControls()
             await loadPlaybackData()
         }
         .onDisappear {
@@ -349,6 +370,8 @@ public struct ScoreReaderView: View {
             playbackEngine.shutdown()
             setlistAdvanceTask?.cancel()
             linkService.disconnect()
+            pedalController.stopMonitoring()
+            midiInputService.stop()
         }
         .onChange(of: viewModel.currentPageIndex) { _, newValue in
             saveReaderSession()
@@ -405,6 +428,9 @@ public struct ScoreReaderView: View {
             guard oldValue == .playing, newValue == .stopped else { return }
             scheduleAutoAdvanceIfNeeded()
         }
+        .onChange(of: externalControlProfileData) { _, _ in
+            applyExternalControlProfile()
+        }
         .sheet(isPresented: $showingDeviceLinkSheet) {
             DevicePairingView(linkService: linkService)
         }
@@ -427,6 +453,9 @@ public struct ScoreReaderView: View {
         .statusBarHidden(!showingControls && !annotationState.isAnnotating)
         #endif
         .persistentSystemOverlays(.hidden)
+        .readerKeyboardShortcuts { key in
+            _ = pageTurnService.handleKeyboardKey(key)
+        }
     }
 
     // MARK: - Load Playback Data
@@ -708,6 +737,14 @@ public struct ScoreReaderView: View {
                         if playbackEngine.state == .playing {
                             readerMetaBadge(icon: "waveform", text: "Playback", accent: ASColors.accentFallback)
                         }
+
+                        if !pedalController.connectedPedals.isEmpty {
+                            readerMetaBadge(icon: "shoeprints.fill", text: "\(pedalController.connectedPedals.count) Pedal", accent: ASColors.info)
+                        }
+
+                        if case .connected(let name) = midiInputService.connectionState {
+                            readerMetaBadge(icon: "pianokeys", text: name, accent: ASColors.warning)
+                        }
                     }
                 }
 
@@ -734,6 +771,11 @@ public struct ScoreReaderView: View {
                     topUtilityButton(icon: "slider.horizontal.3") {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showingPageSetupPanel.toggle()
+                        }
+                    }
+                    topUtilityButton(icon: "dot.arrowtriangles.up.right.down.left.circle") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingExternalControlsPanel.toggle()
                         }
                     }
                     topUtilityButton(icon: isLinkedSessionActive ? "dot.radiowaves.left.and.right" : "ipad.and.iphone") {
@@ -823,6 +865,14 @@ public struct ScoreReaderView: View {
                 controlButton(icon: "slider.horizontal.3", label: "Page", isActive: showingPageSetupPanel) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showingPageSetupPanel.toggle()
+                    }
+                }
+
+                controlDivider
+
+                controlButton(icon: "dot.arrowtriangles.up.right.down.left.circle", label: "Control", isActive: showingExternalControlsPanel) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingExternalControlsPanel.toggle()
                     }
                 }
 
@@ -1825,6 +1875,36 @@ public struct ScoreReaderView: View {
         viewModel.isCropMarginsEnabled ? viewModel.cropInsets : .none
     }
 
+    private var externalControlProfile: ExternalControlProfile {
+        guard let data = externalControlProfileData.data(using: .utf8),
+              let profile = try? JSONDecoder().decode(ExternalControlProfile.self, from: data) else {
+            return .stageDefault
+        }
+        return profile
+    }
+
+    private var pedalStatusSummary: String {
+        if !externalControlProfile.pedalControlEnabled {
+            return "Disabled"
+        }
+        if pedalController.connectedPedals.isEmpty {
+            return "Waiting for pedal"
+        }
+        return pedalController.connectedPedals.map(\.name).joined(separator: ", ")
+    }
+
+    private var midiStatusSummary: String {
+        guard externalControlProfile.midiControlEnabled else { return "Disabled" }
+        switch midiInputService.connectionState {
+        case .connected(let name):
+            return name
+        case .searching:
+            return "Scanning"
+        case .disconnected:
+            return "No MIDI device"
+        }
+    }
+
     private var currentPageSlice: ReaderPageSlice {
         guard viewModel.displayMode == .singlePage, viewModel.pageTurnBehavior == .halfPage else {
             return .full
@@ -2189,6 +2269,80 @@ public struct ScoreReaderView: View {
         .background(readerHUDPanel)
     }
 
+    private var externalControlsPanel: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.md) {
+            HStack {
+                Text("External Controls")
+                    .font(ASTypography.heading3)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingExternalControlsPanel = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            sessionInfoBlock(
+                title: "Status",
+                body: "Pedals: \(pedalStatusSummary)\nMIDI: \(midiStatusSummary)\nLast action: \(pageTurnService.lastAction.label)"
+            )
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("Pedal Mapping")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                ForEach(PedalInputRole.allCases) { role in
+                    HStack {
+                        Text(role.label)
+                            .font(ASTypography.bodySmall)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(externalControlProfile.action(for: role).label)
+                            .font(ASTypography.monoMicro)
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                Text("MIDI Mapping")
+                    .font(ASTypography.label)
+                    .foregroundStyle(.primary)
+
+                ForEach(externalControlProfile.midiMappings.prefix(4)) { mapping in
+                    HStack {
+                        Text("\(mapping.type.label) \(mapping.value)")
+                            .font(ASTypography.bodySmall)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(mapping.action.label)
+                            .font(ASTypography.monoMicro)
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+
+            if isLinkedSessionActive {
+                readerMetaBadge(
+                    icon: externalControlProfile.linkedCommandPropagationEnabled ? "dot.radiowaves.left.and.right" : "slash.circle",
+                    text: externalControlProfile.linkedCommandPropagationEnabled ? "Linked command sync on" : "Linked command sync off",
+                    accent: externalControlProfile.linkedCommandPropagationEnabled ? ASColors.success : ASColors.warning
+                )
+            }
+        }
+        .padding(ASSpacing.lg)
+        .background(readerHUDPanel)
+    }
+
     private var quickJumpPanel: some View {
         VStack(alignment: .leading, spacing: ASSpacing.md) {
             HStack {
@@ -2490,6 +2644,9 @@ public struct ScoreReaderView: View {
                 }
             case .pageChanged(let pageIndex):
                 syncToLinkedPage(pageIndex)
+            case .externalCommand(let action):
+                guard let mappedAction = ExternalControlAction(rawValue: action) else { return }
+                handleExternalControl(mappedAction, trigger: .linkedDevice, shouldPropagate: false)
             default:
                 break
             }
@@ -2497,6 +2654,138 @@ public struct ScoreReaderView: View {
 
         if linkService.isLinked {
             linkService.sendOpenedScore(viewModel.score.id, pageIndex: normalizedSpreadBase(viewModel.currentPageIndex))
+        }
+    }
+
+    private func configureExternalControls() {
+        applyExternalControlProfile()
+        pageTurnService.setHandler { direction in
+            handleTurn(direction, trigger: pageTurnService.lastTrigger ?? .keyboard)
+        }
+        pageTurnService.setActionHandler { action, trigger in
+            handleExternalControl(action, trigger: trigger, shouldPropagate: true)
+        }
+
+        pedalController.onPedalInput = { role in
+            _ = pageTurnService.handlePedalInput(role)
+        }
+        pedalController.startMonitoring()
+
+        midiInputService.onControlEvent = { event in
+            switch event {
+            case .noteOn(let note, _, let channel):
+                _ = pageTurnService.handleMIDIInput(type: .noteOn, value: note, channel: channel)
+            case .controlChange(let controller, _, let channel):
+                _ = pageTurnService.handleMIDIInput(type: .controlChange, value: controller, channel: channel)
+            case .noteOff:
+                break
+            }
+        }
+
+        if externalControlProfile.midiControlEnabled {
+            midiInputService.start()
+        }
+    }
+
+    private func applyExternalControlProfile() {
+        pageTurnService.controlProfile = externalControlProfile
+        if externalControlProfile.midiControlEnabled {
+            midiInputService.start()
+        } else {
+            midiInputService.stop()
+        }
+    }
+
+    private func handleTurn(_ direction: PageTurnService.TurnDirection, trigger: PageTurnService.TurnTrigger) {
+        switch direction {
+        case .forward:
+            if isLinkedTwoScreenSpread {
+                guard linkService.localRole != .secondary else { return }
+                let nextPage = min(linkService.currentPageIndex + 2, max(viewModel.pageCount - 1, 0))
+                linkService.sendPageChange(to: normalizedSpreadBase(nextPage))
+            } else {
+                Task { await viewModel.nextPage() }
+            }
+        case .backward:
+            if isLinkedTwoScreenSpread {
+                guard linkService.localRole != .secondary else { return }
+                let previousPage = max(linkService.currentPageIndex - 2, 0)
+                linkService.sendPageChange(to: normalizedSpreadBase(previousPage))
+            } else {
+                Task { await viewModel.previousPage() }
+            }
+        }
+
+        if trigger != .linkedDevice {
+            scheduleControlsHide()
+        }
+    }
+
+    private func handleExternalControl(
+        _ action: ExternalControlAction,
+        trigger: PageTurnService.TurnTrigger,
+        shouldPropagate: Bool
+    ) {
+        switch action {
+        case .none:
+            return
+        case .nextPage:
+            handleTurn(.forward, trigger: trigger)
+        case .previousPage:
+            handleTurn(.backward, trigger: trigger)
+        case .playPausePlayback:
+            if playbackEngine.state == .playing {
+                playbackEngine.pause()
+            } else {
+                showingPlayback = true
+                playbackEngine.play()
+            }
+        case .stopPlayback:
+            playbackEngine.stop()
+        case .togglePlaybackPanel:
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showingPlayback.toggle()
+            }
+        case .openQuickJump:
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showingQuickJumpPanel.toggle()
+            }
+        case .toggleAnnotationMode:
+            withAnimation(.easeInOut(duration: 0.2)) {
+                annotationState.isAnnotating.toggle()
+                if annotationState.isAnnotating {
+                    showingControls = false
+                }
+            }
+        case .toggleLinkedSession:
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showingLinkSessionPanel.toggle()
+            }
+        case .toggleSetlistPanel:
+            guard setlistItems != nil else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showingSetlistNav.toggle()
+            }
+        case .nextSetlistItem:
+            guard let items = setlistItems, let currentIndex = currentSetlistIndex, currentIndex < items.count - 1 else { return }
+            completeSetlistAdvance(to: currentIndex + 1)
+        case .previousSetlistItem:
+            guard let currentIndex = currentSetlistIndex, currentIndex > 0 else { return }
+            onNavigateSetlist?(currentIndex - 1)
+        case .togglePerformanceLock:
+            viewModel.isPerformanceMode.toggle()
+        }
+
+        if shouldPropagate,
+           externalControlProfile.linkedCommandPropagationEnabled,
+           isLinkedSessionActive,
+           action.propagatesToLinkedSession,
+           trigger != .linkedDevice {
+            linkService.sendExternalCommand(action.rawValue)
+        }
+
+        if trigger != .linkedDevice {
+            scheduleControlsHide()
         }
     }
 
