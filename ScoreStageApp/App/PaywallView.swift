@@ -8,6 +8,7 @@ import DesignSystem
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     let storeService: StoreService
+    @State private var selectedProductID: String?
 
     var body: some View {
         ScrollView {
@@ -26,6 +27,12 @@ struct PaywallView: View {
                         .font(ASTypography.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+
+                    HStack(spacing: ASSpacing.sm) {
+                        paywallBadge("Unlimited Library", icon: "books.vertical.fill")
+                        paywallBadge("Playback Studio", icon: "waveform.circle.fill")
+                        paywallBadge("Linked Devices", icon: "rectangle.on.rectangle.circle.fill")
+                    }
                 }
                 .padding(.top, ASSpacing.xxl)
 
@@ -39,6 +46,19 @@ struct PaywallView: View {
                     featureRow("Score following (microphone/MIDI)", icon: "waveform")
                     featureRow("Export annotated PDFs", icon: "square.and.arrow.up")
                 }
+                .padding(.horizontal, ASSpacing.lg)
+                .accessibleCard("Pro features list", hint: "Shows the capabilities unlocked with ScoreStage Pro.")
+
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    Text("Why musicians upgrade")
+                        .font(ASTypography.heading3)
+                        .foregroundStyle(.primary)
+
+                    Text("Keep every chart in one library, rehearse with synced playback, and run shows across linked devices without rebuilding your workflow.")
+                        .font(ASTypography.bodySmall)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, ASSpacing.lg)
 
                 // Purchase options
@@ -63,6 +83,11 @@ struct PaywallView: View {
                 .font(ASTypography.bodySmall)
                 .foregroundStyle(.secondary)
                 .buttonStyle(.plain)
+                .largeTapTarget()
+
+                Text(storeService.subscriptionStatus)
+                    .font(ASTypography.caption)
+                    .foregroundStyle(.secondary)
 
                 // Error
                 if let error = storeService.errorMessage {
@@ -92,6 +117,16 @@ struct PaywallView: View {
             }
             .buttonStyle(.plain)
             .padding(ASSpacing.lg)
+            .largeTapTarget()
+        }
+        .task {
+            if !storeService.isLoaded {
+                await storeService.loadProducts()
+                await storeService.updatePurchaseStatus()
+            }
+            if selectedProductID == nil {
+                selectedProductID = storeService.products.first?.id
+            }
         }
     }
 
@@ -110,8 +145,24 @@ struct PaywallView: View {
         }
     }
 
+    private func paywallBadge(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+            Text(title)
+        }
+        .font(ASTypography.monoMicro)
+        .foregroundStyle(ASColors.accentFallback)
+        .padding(.horizontal, ASSpacing.sm)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(ASColors.accentFallback.opacity(0.12))
+        )
+    }
+
     private func productCard(_ product: Product) -> some View {
         Button {
+            selectedProductID = product.id
             Task { await storeService.purchase(product) }
         } label: {
             HStack {
@@ -133,20 +184,34 @@ struct PaywallView: View {
 
                 Spacer()
 
-                Text(product.displayPrice)
-                    .font(ASTypography.heading3)
-                    .foregroundStyle(ASColors.accentFallback)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(product.displayPrice)
+                        .font(ASTypography.heading3)
+                        .foregroundStyle(ASColors.accentFallback)
+
+                    if product.id == bestValueProductID {
+                        Text("Best value")
+                            .font(ASTypography.captionSmall)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .padding(ASSpacing.lg)
             .background(ASColors.chromeSurfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous)
-                    .strokeBorder(ASColors.chromeBorder, lineWidth: 0.5)
+                    .strokeBorder(product.id == selectedProductID ? ASColors.accentFallback : ASColors.chromeBorder, lineWidth: product.id == selectedProductID ? 1.5 : 0.5)
             )
         }
         .buttonStyle(.plain)
         .disabled(storeService.isPurchasing)
+        .largeTapTarget()
+        .accessibleCard("\(product.displayName), \(product.displayPrice)", hint: "Double tap to purchase or subscribe.")
+    }
+
+    private var bestValueProductID: String? {
+        storeService.products.first(where: { $0.id == "com.scorestage.pro.yearly" })?.id
     }
 
     private func subscriptionPeriodText(_ period: Product.SubscriptionPeriod) -> String {

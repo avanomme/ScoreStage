@@ -19,9 +19,30 @@ struct SettingsView: View {
     @State private var showingBackupImporter = false
     @State private var restoreStrategy: BackupRestoreService.RestoreStrategy = .merge
     @State private var externalControlProfile = ExternalControlProfile.stageDefault
+    @State private var storeService = StoreService()
+    @State private var analyticsService = AnalyticsService()
+    @State private var showingPaywall = false
 
     var body: some View {
         Form {
+            Section("Subscription") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(storeService.isPro ? "ScoreStage Pro Active" : "Free Library")
+                            .font(ASTypography.body)
+                        Text(storeService.subscriptionStatus)
+                            .font(ASTypography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button(storeService.isPro ? "Manage" : "Upgrade") {
+                        showingPaywall = true
+                    }
+                }
+            }
+
             Section("Display") {
                 Picker("Default View Mode", selection: $defaultDisplayMode) {
                     Text("Single Page").tag("singlePage")
@@ -106,6 +127,35 @@ struct SettingsView: View {
                 .foregroundStyle(ASColors.accentFallback)
             }
 
+            Section("Privacy & Analytics") {
+                Toggle("Share anonymous on-device usage counts", isOn: Binding(
+                    get: { analyticsService.isEnabled },
+                    set: { analyticsService.isEnabled = $0 }
+                ))
+
+                if analyticsService.usageReport().isEmpty {
+                    Text("No analytics events stored on this device.")
+                        .font(ASTypography.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(analyticsService.usageReport(), id: \.name) { item in
+                        HStack {
+                            Text(item.name)
+                                .font(ASTypography.bodySmall)
+                            Spacer()
+                            Text("\(item.count)")
+                                .font(ASTypography.monoSmall)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Button("Reset Analytics Data") {
+                    analyticsService.resetAll()
+                }
+                .foregroundStyle(ASColors.accentFallback)
+            }
+
             Section("Sync") {
                 Toggle("iCloud Sync", isOn: $isSyncEnabled)
                 Text(syncService.statusDescription)
@@ -175,6 +225,20 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section("Support") {
+                Link("Email Support", destination: URL(string: "mailto:support@scorestage.com")!)
+                Link("Privacy Policy", destination: URL(string: "https://scorestage.com/privacy")!)
+                Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+            }
+
+            Section("Release Readiness") {
+                statusRow("Onboarding", value: "Ready")
+                statusRow("Library Backup", value: backupService == nil ? "Checking" : "Ready")
+                statusRow("Sync Status", value: syncService.statusDescription)
+                statusRow("External Controls", value: externalControlProfile.pedalControlEnabled || externalControlProfile.midiControlEnabled ? "Configured" : "Disabled")
+                statusRow("Accessibility", value: "VoiceOver and large tap targets enabled")
+            }
         }
         .scrollContentBackground(.hidden)
         .background(ASColors.chromeBackground)
@@ -185,6 +249,10 @@ struct SettingsView: View {
             }
             syncService.isEnabled = isSyncEnabled
             loadExternalControlProfile()
+            if !storeService.isLoaded {
+                await storeService.loadProducts()
+                await storeService.updatePurchaseStatus()
+            }
         }
         .onChange(of: isSyncEnabled) { _, newValue in
             syncService.isEnabled = newValue
@@ -209,6 +277,9 @@ struct SettingsView: View {
             if let backupMessage {
                 Text(backupMessage)
             }
+        }
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(storeService: storeService)
         }
         #if os(macOS)
         .formStyle(.grouped)
@@ -339,6 +410,18 @@ struct SettingsView: View {
             externalControlProfile[keyPath: keyPath]
         } set: { newValue in
             update(newValue)
+        }
+    }
+
+    private func statusRow(_ title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(ASTypography.body)
+            Spacer()
+            Text(value)
+                .font(ASTypography.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 }

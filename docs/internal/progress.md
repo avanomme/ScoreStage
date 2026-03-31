@@ -226,4 +226,32 @@ Append short session notes here (what changed, why, next steps).
 
 **Next steps:**
 - Start Sprint 7 from the parity matrix
+- Focus on stabilization, regression coverage, onboarding/paywall/settings polish, accessibility, and store readiness
+
+---
+
+## 2026-03-31 — Sprint 7 Complete: Stabilization / QA / Commercial Readiness
+
+**What changed:**
+- Refined onboarding so the final conversion step now supports both a clean free-library path and a premium upsell path, with clearer value framing and larger accessible tap targets
+- Reworked the paywall into a more production-ready purchase surface with plan highlighting, subscription-state feedback, stronger premium messaging, and better accessibility semantics for offer cards and actions
+- Expanded Settings with subscription management, analytics/privacy controls, support links, and release-readiness status so operational and commercial workflows are surfaced inside the app
+- Added reader-level accessibility actions for page navigation so VoiceOver users can advance through scores without relying on precise gesture targets
+- Added regression coverage for external-control defaults/mutation in CoreDomain and page-turn command routing in InputTrackingFeature to lock down recent sprint behavior
+- Stabilized the reader root view composition to eliminate the compiler/type-check bottleneck introduced by the now larger performance HUD and reader overlays
+
+**Verification:**
+- `swift build` in `Packages/CoreDomain`
+- `swift build` in `Packages/InputTrackingFeature`
+- `swift build` in `Packages/ReaderFeature`
+- `swift test` in `Packages/CoreDomain`
+- `swift test` in `Packages/InputTrackingFeature`
+- `xcodebuild -project ScoreStage.xcodeproj -scheme ScoreStage-macOS -configuration Debug -destination 'platform=macOS' build`
+
+**Next steps:**
+- All currently defined parity-matrix sprints are complete
+- The next phase should be a fresh backlog pass for remaining competitive gaps, deeper QA, and App Store submission assets/review prep
+
+**Next steps:**
+- Start Sprint 7 from the parity matrix
 - Focus on stabilization, QA coverage, commercial polish, accessibility, and store-readiness

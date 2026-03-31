@@ -34,4 +34,22 @@ final class CoreDomainTests: XCTestCase {
     func testAllModelTypesPopulated() {
         XCTAssertEqual(allModelTypes.count, 14)
     }
+
+    func testExternalControlProfileDefaults() {
+        let profile = ExternalControlProfile.stageDefault
+
+        XCTAssertEqual(profile.action(for: .left), .previousPage)
+        XCTAssertEqual(profile.action(for: .right), .nextPage)
+        XCTAssertEqual(profile.action(for: .space), .nextPage)
+        XCTAssertEqual(profile.action(for: .tab), .openQuickJump)
+    }
+
+    func testExternalControlProfileMutation() {
+        var profile = ExternalControlProfile.stageDefault
+        profile.setPedalAction(.toggleLinkedSession, for: .auxiliary)
+        profile.setKeyboardAction(.togglePlaybackPanel, for: .returnKey)
+
+        XCTAssertEqual(profile.action(for: .auxiliary), .toggleLinkedSession)
+        XCTAssertEqual(profile.action(for: .returnKey), .togglePlaybackPanel)
+    }
 }

@@ -8,6 +8,8 @@ import DesignSystem
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var currentPage = 0
+    @State private var showingPaywall = false
+    @State private var storeService = StoreService()
 
     let onComplete: () -> Void
 
@@ -80,29 +82,45 @@ struct OnboardingView: View {
                 // Actions
                 VStack(spacing: ASSpacing.md) {
                     if currentPage == pages.count - 1 {
-                        PremiumButton("Get Started", icon: "arrow.right", style: .primary) {
-                            completeOnboarding()
+                        PremiumButton("Start Free Library", icon: "arrow.right", style: .primary) {
+                            completeOnboarding(trackProIntent: false)
                         }
+                        .largeTapTarget()
+                        .accessibilityLabel("Start free library")
+                        .accessibilityHint("Finish onboarding and open your library.")
+
+                        PremiumButton("Explore Pro", icon: "star.circle", style: .secondary) {
+                            showingPaywall = true
+                        }
+                        .largeTapTarget()
+                        .accessibilityLabel("Explore ScoreStage Pro")
+                        .accessibilityHint("Review paid features and subscription options.")
                     } else {
                         PremiumButton("Continue", style: .primary) {
                             withAnimation {
                                 currentPage += 1
                             }
                         }
+                        .largeTapTarget()
+                        .accessibilityHint("Move to the next onboarding page.")
                     }
 
                     if currentPage < pages.count - 1 {
                         Button("Skip") {
-                            completeOnboarding()
+                            completeOnboarding(trackProIntent: false)
                         }
                         .font(ASTypography.bodySmall)
                         .foregroundStyle(.secondary)
                         .buttonStyle(.plain)
+                        .largeTapTarget()
                     }
                 }
                 .padding(.horizontal, ASSpacing.xl)
                 .padding(.bottom, ASSpacing.xxxl)
             }
+        }
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(storeService: storeService)
         }
     }
 
@@ -127,12 +145,39 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(4)
                 .frame(maxWidth: 320)
+
+            if currentPage == pages.count - 1 {
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    onboardingChecklistRow(title: "Import up to 5 scores free", icon: "checkmark.circle.fill")
+                    onboardingChecklistRow(title: "Upgrade later for unlimited library, sync, and playback tools", icon: "star.circle.fill")
+                    onboardingChecklistRow(title: "Your annotations, setlists, and backups stay on-device by default", icon: "lock.shield.fill")
+                }
+                .padding(ASSpacing.lg)
+                .background(ASColors.chromeSurfaceElevated)
+                .clipShape(RoundedRectangle(cornerRadius: ASRadius.lg, style: .continuous))
+                .frame(maxWidth: 420)
+                .accessibleCard("Onboarding checklist. Import five scores free. Upgrade later for unlimited library, sync and playback tools. Data stays on device by default.", hint: "Summary of the free and pro experience.")
+            }
         }
         .padding(.horizontal, ASSpacing.xl)
     }
 
-    private func completeOnboarding() {
+    private func onboardingChecklistRow(title: String, icon: String) -> some View {
+        HStack(spacing: ASSpacing.sm) {
+            Image(systemName: icon)
+                .foregroundStyle(ASColors.accentFallback)
+            Text(title)
+                .font(ASTypography.bodySmall)
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+    }
+
+    private func completeOnboarding(trackProIntent: Bool) {
         hasCompletedOnboarding = true
+        if trackProIntent {
+            UserDefaults.standard.set(true, forKey: "hasSeenPaywallFromOnboarding")
+        }
         onComplete()
     }
 }

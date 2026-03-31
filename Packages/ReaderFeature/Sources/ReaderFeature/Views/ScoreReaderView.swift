@@ -99,6 +99,137 @@ public struct ScoreReaderView: View {
     }
 
     public var body: some View {
+        configuredReaderScene
+    }
+
+    private var configuredReaderScene: AnyView {
+        var view = AnyView(readerScene)
+        view = AnyView(
+            view
+                .task {
+                    await viewModel.loadDocument(from: fileURL)
+                    await restoreReaderSession()
+                    await applyCurrentSetlistPreset()
+                    viewModel.markAsOpened()
+                    loadAnnotations()
+                    setupAnnotationCallbacks()
+                    configureDeviceLink()
+                    configureExternalControls()
+                    await loadPlaybackData()
+                }
+                .onDisappear {
+                    // Auto-save annotations when leaving
+                    saveAnnotations()
+                    persistReaderPreferences()
+                    saveReaderSession()
+                    playbackEngine.stop()
+                    playbackEngine.shutdown()
+                    setlistAdvanceTask?.cancel()
+                    linkService.disconnect()
+                    pedalController.stopMonitoring()
+                    midiInputService.stop()
+                }
+                .onChange(of: viewModel.currentPageIndex) { _, newValue in
+                    saveReaderSession()
+                    guard canBroadcastPageChanges else { return }
+                    let pageToSend = linkService.displayMode == .twoPageSpread
+                        ? max(0, newValue - (newValue % 2))
+                        : newValue
+                    linkService.sendPageChange(to: pageToSend)
+                }
+                .onChange(of: viewModel.displayMode) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: viewModel.paperTheme) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: viewModel.pageTurnBehavior) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: viewModel.isCropMarginsEnabled) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: viewModel.cropInsets) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: viewModel.brightnessAdjustment) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: viewModel.contrastAdjustment) { _, _ in
+                    persistReaderPreferences()
+                    saveReaderSession()
+                }
+                .onChange(of: linkService.currentPageIndex) { _, newValue in
+                    syncToLinkedPage(newValue)
+                }
+                .onChange(of: linkService.connectedPeers.count) { _, newValue in
+                    if newValue > 0 {
+                        linkService.sendOpenedScore(viewModel.score.id, pageIndex: normalizedSpreadBase(viewModel.currentPageIndex))
+                    }
+                }
+                .onChange(of: currentSetlistIndex) { _, _ in
+                    setlistAdvanceTask?.cancel()
+                    activeSetlistCountdown = nil
+                    Task {
+                        await applyCurrentSetlistPreset()
+                    }
+                }
+                .onChange(of: playbackEngine.state) { oldValue, newValue in
+                    guard oldValue == .playing, newValue == .stopped else { return }
+                    scheduleAutoAdvanceIfNeeded()
+                }
+                .onChange(of: externalControlProfileData) { _, _ in
+                    applyExternalControlProfile()
+                }
+                .sheet(isPresented: $showingDeviceLinkSheet) {
+                    DevicePairingView(linkService: linkService)
+                }
+                .sheet(isPresented: $showingExportSheet) {
+                    ExportAnnotationsView { mode in
+                        await exportAnnotations(mode: mode)
+                    }
+                }
+        )
+        #if os(macOS)
+        view = AnyView(
+            view.onHover { hovering in
+                if hovering && !showingControls && !annotationState.isAnnotating {
+                    withAnimation(.easeOut(duration: 0.2)) { showingControls = true }
+                    scheduleControlsHide()
+                }
+            }
+        )
+        #endif
+        view = AnyView(view.toolbar(.hidden))
+        #if os(iOS)
+        view = AnyView(
+            view
+                .navigationBarHidden(true)
+                .statusBarHidden(!showingControls && !annotationState.isAnnotating)
+        )
+        #endif
+        return AnyView(
+            view
+                .persistentSystemOverlays(.hidden)
+                .readerKeyboardShortcuts { key in
+                    _ = pageTurnService.handleKeyboardKey(key)
+                }
+                .readerAccessibility(
+                    currentPage: viewModel.currentPageIndex + 1,
+                    totalPages: max(viewModel.pageCount, 1),
+                    onNextPage: { Task { await viewModel.nextPage() } },
+                    onPreviousPage: { Task { await viewModel.previousPage() } }
+                )
+        )
+    }
+
+    private var readerScene: some View {
         ZStack {
             // Paper background — always light
             viewModel.paperBackgroundColor
@@ -349,112 +480,6 @@ public struct ScoreReaderView: View {
                 }
                 .transition(.opacity.combined(with: .scale))
             }
-        }
-        .task {
-            await viewModel.loadDocument(from: fileURL)
-            await restoreReaderSession()
-            await applyCurrentSetlistPreset()
-            viewModel.markAsOpened()
-            loadAnnotations()
-            setupAnnotationCallbacks()
-            configureDeviceLink()
-            configureExternalControls()
-            await loadPlaybackData()
-        }
-        .onDisappear {
-            // Auto-save annotations when leaving
-            saveAnnotations()
-            persistReaderPreferences()
-            saveReaderSession()
-            playbackEngine.stop()
-            playbackEngine.shutdown()
-            setlistAdvanceTask?.cancel()
-            linkService.disconnect()
-            pedalController.stopMonitoring()
-            midiInputService.stop()
-        }
-        .onChange(of: viewModel.currentPageIndex) { _, newValue in
-            saveReaderSession()
-            guard canBroadcastPageChanges else { return }
-            let pageToSend = linkService.displayMode == .twoPageSpread
-                ? max(0, newValue - (newValue % 2))
-                : newValue
-            linkService.sendPageChange(to: pageToSend)
-        }
-        .onChange(of: viewModel.displayMode) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: viewModel.paperTheme) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: viewModel.pageTurnBehavior) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: viewModel.isCropMarginsEnabled) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: viewModel.cropInsets) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: viewModel.brightnessAdjustment) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: viewModel.contrastAdjustment) { _, _ in
-            persistReaderPreferences()
-            saveReaderSession()
-        }
-        .onChange(of: linkService.currentPageIndex) { _, newValue in
-            syncToLinkedPage(newValue)
-        }
-        .onChange(of: linkService.connectedPeers.count) { _, newValue in
-            if newValue > 0 {
-                linkService.sendOpenedScore(viewModel.score.id, pageIndex: normalizedSpreadBase(viewModel.currentPageIndex))
-            }
-        }
-        .onChange(of: currentSetlistIndex) { _, _ in
-            setlistAdvanceTask?.cancel()
-            activeSetlistCountdown = nil
-            Task {
-                await applyCurrentSetlistPreset()
-            }
-        }
-        .onChange(of: playbackEngine.state) { oldValue, newValue in
-            guard oldValue == .playing, newValue == .stopped else { return }
-            scheduleAutoAdvanceIfNeeded()
-        }
-        .onChange(of: externalControlProfileData) { _, _ in
-            applyExternalControlProfile()
-        }
-        .sheet(isPresented: $showingDeviceLinkSheet) {
-            DevicePairingView(linkService: linkService)
-        }
-        .sheet(isPresented: $showingExportSheet) {
-            ExportAnnotationsView { mode in
-                await exportAnnotations(mode: mode)
-            }
-        }
-        #if os(macOS)
-        .onHover { hovering in
-            if hovering && !showingControls && !annotationState.isAnnotating {
-                withAnimation(.easeOut(duration: 0.2)) { showingControls = true }
-                scheduleControlsHide()
-            }
-        }
-        #endif
-        .toolbar(.hidden)
-        #if os(iOS)
-        .navigationBarHidden(true)
-        .statusBarHidden(!showingControls && !annotationState.isAnnotating)
-        #endif
-        .persistentSystemOverlays(.hidden)
-        .readerKeyboardShortcuts { key in
-            _ = pageTurnService.handleKeyboardKey(key)
         }
     }
 

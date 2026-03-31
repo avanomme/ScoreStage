@@ -4,12 +4,12 @@ import Combine
 
 /// Unified page turn service handling keyboard, pedal, and gesture triggers.
 public final class PageTurnService: ObservableObject, @unchecked Sendable {
-    public enum TurnDirection {
+    public enum TurnDirection: Equatable {
         case forward
         case backward
     }
 
-    public enum TurnTrigger {
+    public enum TurnTrigger: Equatable {
         case tap
         case swipe
         case keyboard
