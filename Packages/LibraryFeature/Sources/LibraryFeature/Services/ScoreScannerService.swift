@@ -11,6 +11,83 @@ import PDFKit
 @MainActor
 public final class ScoreScannerService {
 
+    public enum ScanIssueSeverity: String, Codable, Sendable {
+        case info
+        case warning
+        case critical
+    }
+
+    public struct ScanIssue: Codable, Identifiable, Sendable {
+        public var id: UUID
+        public let severity: ScanIssueSeverity
+        public let title: String
+        public let message: String
+
+        public init(severity: ScanIssueSeverity, title: String, message: String) {
+            self.id = UUID()
+            self.severity = severity
+            self.title = title
+            self.message = message
+        }
+    }
+
+    public struct PageQualityReport: Codable, Sendable {
+        public let score: Int
+        public let edgeConfidence: Double
+        public let contrast: Double
+        public let brightness: Double
+        public let warp: Double
+        public let issues: [ScanIssue]
+
+        public init(
+            score: Int,
+            edgeConfidence: Double,
+            contrast: Double,
+            brightness: Double,
+            warp: Double,
+            issues: [ScanIssue]
+        ) {
+            self.score = score
+            self.edgeConfidence = edgeConfidence
+            self.contrast = contrast
+            self.brightness = brightness
+            self.warp = warp
+            self.issues = issues
+        }
+
+        public var requiresRescan: Bool {
+            issues.contains { $0.severity == .critical }
+        }
+    }
+
+    public struct ExportedScanSamplePage: Codable, Sendable {
+        public let index: Int
+        public let originalFileName: String
+        public let enhancedFileName: String?
+        public let qualityReport: PageQualityReport
+
+        public init(index: Int, originalFileName: String, enhancedFileName: String?, qualityReport: PageQualityReport) {
+            self.index = index
+            self.originalFileName = originalFileName
+            self.enhancedFileName = enhancedFileName
+            self.qualityReport = qualityReport
+        }
+    }
+
+    public struct ExportedScanSampleManifest: Codable, Sendable {
+        public let title: String
+        public let createdAt: Date
+        public let pageCount: Int
+        public let pages: [ExportedScanSamplePage]
+
+        public init(title: String, createdAt: Date, pageCount: Int, pages: [ExportedScanSamplePage]) {
+            self.title = title
+            self.createdAt = createdAt
+            self.pageCount = pageCount
+            self.pages = pages
+        }
+    }
+
     // MARK: - Enhancement Filter
 
     public enum EnhancementFilter: String, CaseIterable, Identifiable, Sendable {
@@ -67,30 +144,100 @@ public final class ScoreScannerService {
         return renderIntoStandardPage(enhanced)
     }
 
+    public func qualityReport(for image: UIImage) -> PageQualityReport {
+        let prepared = preparePageForScoreReading(image)
+        guard let cgImage = prepared.cgImage else {
+            return PageQualityReport(
+                score: 0,
+                edgeConfidence: 0,
+                contrast: 0,
+                brightness: 0,
+                warp: 1,
+                issues: [ScanIssue(severity: .critical, title: "Unreadable Capture", message: "The page could not be analyzed. Rescan this page.")]
+            )
+        }
+
+        let metrics = imageMetrics(for: cgImage)
+        var issues: [ScanIssue] = []
+        var score = 100
+
+        if metrics.edgeConfidence < 0.55 {
+            issues.append(ScanIssue(severity: .critical, title: "Weak Page Detection", message: "The page edges were not isolated cleanly. Rescan with the full page visible."))
+            score -= 28
+        } else if metrics.edgeConfidence < 0.72 {
+            issues.append(ScanIssue(severity: .warning, title: "Loose Page Framing", message: "Page edges look uncertain. Check for clipped corners or background intrusion."))
+            score -= 14
+        }
+
+        if metrics.warp > 0.1 {
+            issues.append(ScanIssue(severity: .critical, title: "Page Warp Detected", message: "The page still looks curved after cleanup. Flatten the book or rescan from higher above."))
+            score -= 26
+        } else if metrics.warp > 0.05 {
+            issues.append(ScanIssue(severity: .warning, title: "Residual Curl", message: "The page shows some book curvature. Verify that staves stay straight across the page."))
+            score -= 10
+        }
+
+        if metrics.contrast < 0.15 {
+            issues.append(ScanIssue(severity: .critical, title: "Low Notation Contrast", message: "Staff lines and noteheads may be too soft to play from comfortably. Increase light and rescan."))
+            score -= 24
+        } else if metrics.contrast < 0.22 {
+            issues.append(ScanIssue(severity: .warning, title: "Soft Staff Detail", message: "Notation contrast is acceptable but not ideal. Fine details may look weak on stage."))
+            score -= 10
+        }
+
+        if metrics.brightness < 0.68 {
+            issues.append(ScanIssue(severity: .warning, title: "Dark Capture", message: "Uneven or low light was detected. Shadows can hide ledger lines and markings."))
+            score -= 8
+        } else if metrics.brightness > 0.97 {
+            issues.append(ScanIssue(severity: .warning, title: "Washed Highlights", message: "The page is very bright and may lose pencil marks or lighter notation detail."))
+            score -= 6
+        }
+
+        return PageQualityReport(
+            score: max(0, score),
+            edgeConfidence: metrics.edgeConfidence,
+            contrast: metrics.contrast,
+            brightness: metrics.brightness,
+            warp: metrics.warp,
+            issues: issues
+        )
+    }
+
     // MARK: - Filters
 
     private func applyAdaptiveThreshold(_ input: CIImage) -> CIImage {
-        // Convert to grayscale first
         let grayscale = applyGrayscale(input)
+        let flattened = grayscale.applyingFilter("CIHighlightShadowAdjust", parameters: [
+            "inputShadowAmount": 0.85,
+            "inputHighlightAmount": 0.92
+        ])
 
-        // Increase contrast dramatically for B&W effect
+        let sharpen = CIFilter.unsharpMask()
+        sharpen.inputImage = flattened
+        sharpen.radius = 1.2
+        sharpen.intensity = 1.35
+
         let colorControls = CIFilter.colorControls()
-        colorControls.inputImage = grayscale
-        colorControls.contrast = 3.0
-        colorControls.brightness = 0.1
+        colorControls.inputImage = sharpen.outputImage ?? flattened
+        colorControls.contrast = 3.4
+        colorControls.brightness = 0.06
+        colorControls.saturation = 0
         guard let contrasted = colorControls.outputImage else { return input }
 
-        // Clamp to pure B&W using CIFilter key-value API
+        let morphology = CIFilter.maximumComponent()
+        morphology.inputImage = contrasted
+        let componentFiltered = morphology.outputImage ?? contrasted
+
         guard let clamp = CIFilter(
             name: "CIColorClamp",
             parameters: [
-                kCIInputImageKey: contrasted,
-                "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 1),
-                "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
+                kCIInputImageKey: componentFiltered,
+                "inputMinComponents": CIVector(x: 0.03, y: 0.03, z: 0.03, w: 1),
+                "inputMaxComponents": CIVector(x: 0.98, y: 0.98, z: 0.98, w: 1)
             ]
-        ) else { return contrasted }
+        ) else { return componentFiltered }
 
-        return clamp.outputImage ?? contrasted
+        return clamp.outputImage ?? componentFiltered
     }
 
     private func applyGrayscale(_ input: CIImage) -> CIImage {
@@ -168,6 +315,63 @@ public final class ScoreScannerService {
         return pdfURL
     }
 
+    public func exportSampleBundle(
+        title: String,
+        pages: [(original: UIImage, enhanced: UIImage?, report: PageQualityReport)]
+    ) throws -> URL {
+        guard !pages.isEmpty else {
+            throw ScanError.noPages
+        }
+
+        let baseName = title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let bundleName = baseName.isEmpty ? "ScoreScanSample" : baseName
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(bundleName)-Samples", isDirectory: true)
+
+        try? FileManager.default.removeItem(at: rootURL)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        var manifestPages: [ExportedScanSamplePage] = []
+        for (index, page) in pages.enumerated() {
+            let originalName = "page-\(index + 1)-original.png"
+            let originalURL = rootURL.appendingPathComponent(originalName)
+            guard let originalData = page.original.pngData() else { continue }
+            try originalData.write(to: originalURL)
+
+            var enhancedName: String?
+            if let enhanced = page.enhanced, let enhancedData = enhanced.pngData() {
+                let name = "page-\(index + 1)-enhanced.png"
+                try enhancedData.write(to: rootURL.appendingPathComponent(name))
+                enhancedName = name
+            }
+
+            manifestPages.append(
+                ExportedScanSamplePage(
+                    index: index,
+                    originalFileName: originalName,
+                    enhancedFileName: enhancedName,
+                    qualityReport: page.report
+                )
+            )
+        }
+
+        let manifest = ExportedScanSampleManifest(
+            title: title,
+            createdAt: Date(),
+            pageCount: manifestPages.count,
+            pages: manifestPages
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(manifest)
+        try data.write(to: rootURL.appendingPathComponent("manifest.json"))
+        return rootURL
+    }
+
     /// Calculate optimal page size maintaining aspect ratio at high DPI.
     private func optimizedPageSize(for image: UIImage) -> CGSize {
         let portrait = image.size.height >= image.size.width
@@ -230,7 +434,9 @@ public final class ScoreScannerService {
         let pageIsolated = cropToDetectedPage(normalized)
         let aligned = refinePageAlignment(pageIsolated)
         let reisolated = cropToDetectedPage(aligned)
-        let normalizedWhites = normalizeWhitePoint(reisolated)
+        let warpCorrected = flattenBookWarpIfNeeded(reisolated)
+        let finalIsolated = cropToDetectedPage(warpCorrected)
+        let normalizedWhites = normalizeWhitePoint(finalIsolated)
         let shadowFlattened = flattenPageLighting(normalizedWhites)
         let despeckled = removeSpeckleNoise(from: shadowFlattened)
         let contrastBalanced = balanceNotationContrast(despeckled)
@@ -375,6 +581,199 @@ public final class ScoreScannerService {
         guard varianceY > 0 else { return .nan }
         let slope = covariance / varianceY
         return atan(slope)
+    }
+
+    private func flattenBookWarpIfNeeded(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+
+        let bounds = contentBoundsByRow(for: cgImage)
+        guard bounds.count > 24 else { return image }
+
+        let lefts = bounds.map(\.lowerBound)
+        let rights = bounds.map(\.upperBound)
+        let avgLeft = lefts.reduce(0, +) / CGFloat(lefts.count)
+        let avgRight = rights.reduce(0, +) / CGFloat(rights.count)
+        let warpAmount = normalizedWarp(lefts: lefts, rights: rights, width: CGFloat(cgImage.width))
+
+        guard warpAmount > 0.035 else { return image }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        var sourcePixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+        var outputPixels = [UInt8](repeating: 255, count: height * bytesPerRow)
+
+        guard let sourceContext = CGContext(
+            data: &sourcePixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ),
+        let outputContext = CGContext(
+            data: &outputPixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return image
+        }
+
+        sourceContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        for y in 0..<height {
+            let row = bounds[min(y, bounds.count - 1)]
+            let sourceLeft = row.lowerBound
+            let sourceRight = Swift.max(row.upperBound, sourceLeft + 1)
+            let targetLeft = avgLeft
+            let targetRight = Swift.max(avgRight, targetLeft + 1)
+
+            for x in 0..<width {
+                let destinationX = CGFloat(x)
+                let normalizedX = (destinationX - targetLeft) / Swift.max(targetRight - targetLeft, 1)
+                let sourceX = sourceLeft + (normalizedX * (sourceRight - sourceLeft))
+                let sampleX = min(max(Int(sourceX.rounded()), 0), width - 1)
+
+                let sourceOffset = y * bytesPerRow + sampleX * bytesPerPixel
+                let outputOffset = y * bytesPerRow + x * bytesPerPixel
+
+                outputPixels[outputOffset] = sourcePixels[sourceOffset]
+                outputPixels[outputOffset + 1] = sourcePixels[sourceOffset + 1]
+                outputPixels[outputOffset + 2] = sourcePixels[sourceOffset + 2]
+                outputPixels[outputOffset + 3] = sourcePixels[sourceOffset + 3]
+            }
+        }
+
+        guard let warped = outputContext.makeImage() else { return image }
+        return UIImage(cgImage: warped, scale: image.scale, orientation: .up)
+    }
+
+    private func contentBoundsByRow(for cgImage: CGImage) -> [ClosedRange<CGFloat>] {
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return []
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var rows: [ClosedRange<CGFloat>] = []
+        let fallback = 0...CGFloat(max(width - 1, 1))
+        var previous = fallback
+
+        for y in 0..<height {
+            var minX: Int?
+            var maxX: Int?
+
+            for x in 0..<width {
+                let offset = y * bytesPerRow + x * bytesPerPixel
+                let r = CGFloat(pixels[offset])
+                let g = CGFloat(pixels[offset + 1])
+                let b = CGFloat(pixels[offset + 2])
+                let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+                if luminance < 245 {
+                    minX = minX.map { min($0, x) } ?? x
+                    maxX = maxX.map { max($0, x) } ?? x
+                }
+            }
+
+            if let minX, let maxX, maxX > minX {
+                previous = CGFloat(minX)...CGFloat(maxX)
+                rows.append(previous)
+            } else {
+                rows.append(previous)
+            }
+        }
+
+        return rows
+    }
+
+    private func normalizedWarp(lefts: [CGFloat], rights: [CGFloat], width: CGFloat) -> Double {
+        guard width > 0, !lefts.isEmpty, lefts.count == rights.count else { return 0 }
+        let avgLeft = lefts.reduce(0, +) / CGFloat(lefts.count)
+        let avgRight = rights.reduce(0, +) / CGFloat(rights.count)
+        let leftDeviation = lefts.reduce(0) { $0 + abs($1 - avgLeft) } / CGFloat(lefts.count)
+        let rightDeviation = rights.reduce(0) { $0 + abs($1 - avgRight) } / CGFloat(rights.count)
+        return Double((leftDeviation + rightDeviation) / (2 * width))
+    }
+
+    private func imageMetrics(for cgImage: CGImage) -> (edgeConfidence: Double, contrast: Double, brightness: Double, warp: Double) {
+        let rows = contentBoundsByRow(for: cgImage)
+        guard !rows.isEmpty else {
+            return (0, 0, 0, 1)
+        }
+
+        let width = CGFloat(cgImage.width)
+        let heights = rows.map { $0.upperBound - $0.lowerBound }
+        let pageCoverage = heights.reduce(0, +) / CGFloat(rows.count) / max(width, 1)
+        let warp = normalizedWarp(lefts: rows.map(\.lowerBound), rights: rows.map(\.upperBound), width: width)
+
+        let stats = luminanceStatistics(for: cgImage)
+        let contrast = min(max(stats.standardDeviation / 255.0, 0), 1)
+        let brightness = min(max(stats.mean / 255.0, 0), 1)
+        let edgeConfidence = min(max(Double((pageCoverage - 0.45) / 0.35), 0), 1)
+
+        return (edgeConfidence, contrast, brightness, warp)
+    }
+
+    private func luminanceStatistics(for cgImage: CGImage) -> (mean: Double, standardDeviation: Double) {
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return (0, 0)
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        let step = max(1, min(width, height) / 240)
+        var values: [Double] = []
+        values.reserveCapacity((width / step) * (height / step))
+
+        for y in stride(from: 0, to: height, by: step) {
+            for x in stride(from: 0, to: width, by: step) {
+                let offset = y * bytesPerRow + x * bytesPerPixel
+                let r = Double(pixels[offset])
+                let g = Double(pixels[offset + 1])
+                let b = Double(pixels[offset + 2])
+                values.append((0.2126 * r) + (0.7152 * g) + (0.0722 * b))
+            }
+        }
+
+        guard !values.isEmpty else { return (0, 0) }
+        let mean = values.reduce(0, +) / Double(values.count)
+        let variance = values.reduce(0) { $0 + pow($1 - mean, 2) } / Double(values.count)
+        return (mean, sqrt(variance))
     }
 
     private func bestDocumentRectangle(in image: CIImage) -> CIRectangleFeature? {
