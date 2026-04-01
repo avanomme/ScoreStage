@@ -228,10 +228,14 @@ public final class ScoreScannerService {
     public func preparePageForScoreReading(_ image: UIImage) -> UIImage {
         let normalized = normalizeOrientation(image)
         let pageIsolated = cropToDetectedPage(normalized)
-        let normalizedWhites = normalizeWhitePoint(pageIsolated)
-        let despeckled = removeSpeckleNoise(from: normalizedWhites)
+        let aligned = refinePageAlignment(pageIsolated)
+        let reisolated = cropToDetectedPage(aligned)
+        let normalizedWhites = normalizeWhitePoint(reisolated)
+        let shadowFlattened = flattenPageLighting(normalizedWhites)
+        let despeckled = removeSpeckleNoise(from: shadowFlattened)
         let contrastBalanced = balanceNotationContrast(despeckled)
-        let borderTrimmed = trimBackgroundBorder(from: contrastBalanced)
+        let notationEnhanced = preserveNotationEdges(in: contrastBalanced)
+        let borderTrimmed = trimBackgroundBorder(from: notationEnhanced)
         return renderIntoStandardPage(borderTrimmed)
     }
 
@@ -252,6 +256,125 @@ public final class ScoreScannerService {
             return image
         }
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
+    private func refinePageAlignment(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image),
+              let rect = bestDocumentRectangle(in: ciImage) else {
+            return straightenFromContentBounds(image)
+        }
+
+        let topAngle = atan2(rect.topRight.y - rect.topLeft.y, rect.topRight.x - rect.topLeft.x)
+        let bottomAngle = atan2(rect.bottomRight.y - rect.bottomLeft.y, rect.bottomRight.x - rect.bottomLeft.x)
+        let averageAngle = (topAngle + bottomAngle) / 2
+
+        guard abs(averageAngle) > 0.003 else {
+            return straightenFromContentBounds(image)
+        }
+
+        let straighten = CIFilter.straighten()
+        straighten.inputImage = ciImage
+        straighten.angle = Float(-averageAngle)
+
+        guard let output = straighten.outputImage?.cropped(to: straighten.outputImage?.extent ?? ciImage.extent),
+              let cgImage = ciContext.createCGImage(output, from: output.extent.integral) else {
+            return straightenFromContentBounds(image)
+        }
+
+        let straightened = UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+        return straightenFromContentBounds(straightened)
+    }
+
+    private func straightenFromContentBounds(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: Int(height * bytesPerRow))
+
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return image
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        let sampleRows = stride(from: max(height / 10, 1), to: height - max(height / 10, 1), by: max(height / 8, 1))
+        var leftSamples: [CGPoint] = []
+        var rightSamples: [CGPoint] = []
+
+        for y in sampleRows {
+            if let left = firstDarkPixel(in: pixels, width: width, bytesPerRow: bytesPerRow, y: y, range: 0..<width / 2) {
+                leftSamples.append(CGPoint(x: left, y: CGFloat(y)))
+            }
+            if let right = firstDarkPixel(in: pixels, width: width, bytesPerRow: bytesPerRow, y: y, range: stride(from: width - 1, through: width / 2, by: -1)) {
+                rightSamples.append(CGPoint(x: right, y: CGFloat(y)))
+            }
+        }
+
+        let leftAngle = regressionAngle(for: leftSamples)
+        let rightAngle = regressionAngle(for: rightSamples)
+        let candidateAngles = [leftAngle, rightAngle].filter { !$0.isNaN && abs($0) < (.pi / 8) }
+        guard !candidateAngles.isEmpty else { return image }
+
+        let averageAngle = candidateAngles.reduce(0, +) / CGFloat(candidateAngles.count)
+        guard abs(averageAngle) > 0.003,
+              let ciImage = CIImage(image: image) else {
+            return image
+        }
+
+        let straighten = CIFilter.straighten()
+        straighten.inputImage = ciImage
+        straighten.angle = Float(-averageAngle)
+
+        guard let output = straighten.outputImage,
+              let rotated = ciContext.createCGImage(output, from: output.extent.integral) else {
+            return image
+        }
+
+        return UIImage(cgImage: rotated, scale: image.scale, orientation: .up)
+    }
+
+    private func firstDarkPixel<S: Sequence>(in pixels: [UInt8], width: Int, bytesPerRow: Int, y: Int, range: S) -> CGFloat? where S.Element == Int {
+        for x in range where x >= 0 && x < width {
+            let offset = y * bytesPerRow + x * 4
+            let r = CGFloat(pixels[offset])
+            let g = CGFloat(pixels[offset + 1])
+            let b = CGFloat(pixels[offset + 2])
+            let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            if luminance < 245 {
+                return CGFloat(x)
+            }
+        }
+        return nil
+    }
+
+    private func regressionAngle(for points: [CGPoint]) -> CGFloat {
+        guard points.count >= 2 else { return .nan }
+
+        let count = CGFloat(points.count)
+        let meanX = points.reduce(0) { $0 + $1.x } / count
+        let meanY = points.reduce(0) { $0 + $1.y } / count
+
+        let covariance = points.reduce(0) { partial, point in
+            partial + ((point.x - meanX) * (point.y - meanY))
+        }
+        let varianceY = points.reduce(0) { partial, point in
+            partial + pow(point.y - meanY, 2)
+        }
+
+        guard varianceY > 0 else { return .nan }
+        let slope = covariance / varianceY
+        return atan(slope)
     }
 
     private func bestDocumentRectangle(in image: CIImage) -> CIRectangleFeature? {
@@ -358,6 +481,28 @@ public final class ScoreScannerService {
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
     }
 
+    private func flattenPageLighting(_ image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        let shadowAdjust = CIFilter.highlightShadowAdjust()
+        shadowAdjust.inputImage = ciImage
+        shadowAdjust.shadowAmount = 0.75
+        shadowAdjust.highlightAmount = 0.95
+
+        let controls = CIFilter.colorControls()
+        controls.inputImage = shadowAdjust.outputImage
+        controls.brightness = 0.02
+        controls.contrast = 1.12
+        controls.saturation = 0
+
+        guard let output = controls.outputImage,
+              let cgImage = ciContext.createCGImage(output, from: output.extent) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
     private func removeSpeckleNoise(from image: UIImage) -> UIImage {
         guard let ciImage = CIImage(image: image) else { return image }
 
@@ -385,6 +530,28 @@ public final class ScoreScannerService {
         sharpen.sharpness = 0.45
 
         guard let output = sharpen.outputImage,
+              let cgImage = ciContext.createCGImage(output, from: output.extent) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
+    private func preserveNotationEdges(in image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+
+        let unsharp = CIFilter.unsharpMask()
+        unsharp.inputImage = ciImage
+        unsharp.radius = 1.4
+        unsharp.intensity = 1.15
+
+        let controls = CIFilter.colorControls()
+        controls.inputImage = unsharp.outputImage
+        controls.contrast = 1.24
+        controls.brightness = 0.005
+        controls.saturation = 0
+
+        guard let output = controls.outputImage,
               let cgImage = ciContext.createCGImage(output, from: output.extent) else {
             return image
         }

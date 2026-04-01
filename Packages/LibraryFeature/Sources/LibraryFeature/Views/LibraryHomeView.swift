@@ -1578,7 +1578,13 @@ struct ScoreListRow: View {
 // MARK: - Inspector Panel (spec Section E.3)
 
 struct ScoreInspectorPanel: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ScoreFamily.name) private var families: [ScoreFamily]
     let score: Score
+
+    private var familyService: ScoreFamilyService {
+        ScoreFamilyService(modelContext: modelContext)
+    }
 
     var body: some View {
         ScrollView {
@@ -1658,10 +1664,93 @@ struct ScoreInspectorPanel: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Divider()
+                familySection
             }
             .padding(ASSpacing.screenPadding)
         }
         .inspectorColumnWidth(min: 240, ideal: 300, max: 380)
+    }
+
+    @ViewBuilder
+    private var familySection: some View {
+        VStack(alignment: .leading, spacing: ASSpacing.sm) {
+            Text("SCORE FAMILY")
+                .font(ASTypography.labelMicro)
+                .foregroundStyle(.secondary)
+                .tracking(0.5)
+
+            if let family = score.family {
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    Text(family.name)
+                        .font(ASTypography.label)
+
+                    if !family.composer.isEmpty {
+                        Text(family.composer)
+                            .font(ASTypography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Picker("Role", selection: roleBinding(for: family)) {
+                        ForEach(ScoreRole.allCases, id: \.self) { role in
+                            Text(roleLabel(role)).tag(role)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    if family.scores.count > 1 {
+                        VStack(alignment: .leading, spacing: ASSpacing.xs) {
+                            Text("RELATED SCORES")
+                                .font(ASTypography.labelSmall)
+                                .foregroundStyle(.secondary)
+
+                            ForEach(family.scores.filter { $0.id != score.id }.sorted { $0.title < $1.title }, id: \.id) { sibling in
+                                HStack {
+                                    Text(sibling.title)
+                                        .font(ASTypography.bodySmall)
+                                    Spacer()
+                                    Text(roleLabel(family.role(for: sibling)))
+                                        .font(ASTypography.captionSmall)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    Button("Remove From Family", role: .destructive) {
+                        familyService.removeScore(score, from: family)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    Button("Create Family From Score") {
+                        let family = familyService.createFamily(
+                            name: score.title,
+                            composer: score.composer,
+                            scores: [score]
+                        )
+                        familyService.setRole(.fullScore, for: score, in: family)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    if !families.isEmpty {
+                        Menu("Join Existing Family") {
+                            ForEach(families, id: \.id) { family in
+                                Menu(family.name) {
+                                    ForEach(ScoreRole.allCases, id: \.self) { role in
+                                        Button(roleLabel(role)) {
+                                            familyService.addScore(score, to: family, role: role)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -1674,6 +1763,30 @@ struct ScoreInspectorPanel: View {
                 Text(value)
                     .font(ASTypography.bodySmall)
             }
+        }
+    }
+
+    private func roleBinding(for family: ScoreFamily) -> Binding<ScoreRole> {
+        Binding(
+            get: { family.role(for: score) },
+            set: { newRole in
+                familyService.setRole(newRole, for: score, in: family)
+            }
+        )
+    }
+
+    private func roleLabel(_ role: ScoreRole) -> String {
+        switch role {
+        case .fullScore:
+            return "Full Score"
+        case .part:
+            return "Part"
+        case .pianoReduction:
+            return "Piano Reduction"
+        case .alternateEdition:
+            return "Alternate Edition"
+        case .arrangement:
+            return "Arrangement"
         }
     }
 }

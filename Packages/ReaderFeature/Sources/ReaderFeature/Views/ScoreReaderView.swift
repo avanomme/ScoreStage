@@ -58,15 +58,20 @@ public struct ScoreReaderView: View {
     @State private var showingPageSetupPanel = false
     @State private var showingExportSheet = false
     @State private var showingExternalControlsPanel = false
+    @State private var showingMotionTrackingSheet = false
+    @State private var showingScoreFollowingSheet = false
     @State private var pageTurnService = PageTurnService()
     @State private var pedalController = PedalControllerService()
     @State private var midiInputService = MIDIInputService()
+    @State private var motionTrackingManager = MotionTrackingManager()
+    @State private var scoreFollowingService = ScoreFollowingService()
     @AppStorage(ExternalControlProfileStorage.defaultsKey) private var externalControlProfileData = ""
 
     // Setlist navigation
     let setlistItems: [SetListItem]?
     let currentSetlistIndex: Int?
     let onNavigateSetlist: ((Int) -> Void)?
+    let onSessionStateChanged: ((UUID, Int, String, UUID?, Int?) -> Void)?
     @State private var showingSetlistNav = false
     @State private var setlistAdvanceTask: Task<Void, Never>?
     @State private var activeSetlistCountdown: SetlistAdvanceCountdown?
@@ -78,7 +83,8 @@ public struct ScoreReaderView: View {
         onClose: (() -> Void)? = nil,
         setlistItems: [SetListItem]? = nil,
         currentSetlistIndex: Int? = nil,
-        onNavigateSetlist: ((Int) -> Void)? = nil
+        onNavigateSetlist: ((Int) -> Void)? = nil,
+        onSessionStateChanged: ((UUID, Int, String, UUID?, Int?) -> Void)? = nil
     ) {
         self._viewModel = State(initialValue: ReaderViewModel(score: score))
         self.fileURL = fileURL
@@ -87,6 +93,7 @@ public struct ScoreReaderView: View {
         self.setlistItems = setlistItems
         self.currentSetlistIndex = currentSetlistIndex
         self.onNavigateSetlist = onNavigateSetlist
+        self.onSessionStateChanged = onSessionStateChanged
     }
 
     private var hasPlaybackData: Bool { normalizedScore != nil }
@@ -115,7 +122,9 @@ public struct ScoreReaderView: View {
                     setupAnnotationCallbacks()
                     configureDeviceLink()
                     configureExternalControls()
+                    configureMotionTracking()
                     await loadPlaybackData()
+                    publishSessionState()
                 }
                 .onDisappear {
                     // Auto-save annotations when leaving
@@ -128,9 +137,12 @@ public struct ScoreReaderView: View {
                     linkService.disconnect()
                     pedalController.stopMonitoring()
                     midiInputService.stop()
+                    motionTrackingManager.stopTracking()
+                    scoreFollowingService.stop()
                 }
                 .onChange(of: viewModel.currentPageIndex) { _, newValue in
                     saveReaderSession()
+                    publishSessionState(pageIndex: newValue)
                     guard canBroadcastPageChanges else { return }
                     let pageToSend = linkService.displayMode == .twoPageSpread
                         ? max(0, newValue - (newValue % 2))
@@ -140,6 +152,7 @@ public struct ScoreReaderView: View {
                 .onChange(of: viewModel.displayMode) { _, _ in
                     persistReaderPreferences()
                     saveReaderSession()
+                    publishSessionState()
                 }
                 .onChange(of: viewModel.paperTheme) { _, _ in
                     persistReaderPreferences()
@@ -176,6 +189,7 @@ public struct ScoreReaderView: View {
                 .onChange(of: currentSetlistIndex) { _, _ in
                     setlistAdvanceTask?.cancel()
                     activeSetlistCountdown = nil
+                    publishSessionState()
                     Task {
                         await applyCurrentSetlistPreset()
                     }
@@ -194,6 +208,12 @@ public struct ScoreReaderView: View {
                     ExportAnnotationsView { mode in
                         await exportAnnotations(mode: mode)
                     }
+                }
+                .sheet(isPresented: $showingMotionTrackingSheet) {
+                    motionTrackingSheet
+                }
+                .sheet(isPresented: $showingScoreFollowingSheet) {
+                    scoreFollowingSheet
                 }
         )
         #if os(macOS)
@@ -509,6 +529,7 @@ public struct ScoreReaderView: View {
                 playbackEngine.onPlaybackComplete = {
                     withAnimation { showingPlayback = false }
                 }
+                configureScoreFollowing(score: score, measureMap: map)
             }
         } catch {
             // MusicXML parse failed — playback unavailable for this score
@@ -895,6 +916,20 @@ public struct ScoreReaderView: View {
 
                 controlDivider
 
+                controlButton(icon: "face.smiling", label: "Hands-Free", isActive: showingMotionTrackingSheet || motionTrackingManager.isRunning) {
+                    showingMotionTrackingSheet = true
+                }
+
+                if hasPlaybackData {
+                    controlDivider
+
+                    controlButton(icon: "waveform.and.mic", label: "Follow", isActive: showingScoreFollowingSheet || scoreFollowingIsRunning) {
+                        showingScoreFollowingSheet = true
+                    }
+                }
+
+                controlDivider
+
                 controlButton(icon: "dot.arrowtriangles.up.right.down.left.circle", label: "Control", isActive: showingExternalControlsPanel) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showingExternalControlsPanel.toggle()
@@ -1041,6 +1076,118 @@ public struct ScoreReaderView: View {
             .background(readerHUDPanel)
             .padding(.horizontal, ASSpacing.lg)
             .padding(.bottom, ASSpacing.screenPadding)
+        }
+    }
+
+    private var motionTrackingSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: ASSpacing.md) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Hands-Free Page Turns")
+                            .font(ASTypography.heading2)
+                        Text("Calibrate head movement and eye gaze directly against the active score.")
+                            .font(ASTypography.bodySmall)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Done") {
+                        showingMotionTrackingSheet = false
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ASColors.accentFallback)
+                }
+
+                Toggle("Enable Head Tracking", isOn: $motionTrackingManager.headTrackingEnabled)
+                    .tint(ASColors.accentFallback)
+                Toggle("Enable Eye Gaze", isOn: $motionTrackingManager.eyeGazeEnabled)
+                    .tint(ASColors.accentFallback)
+
+                HStack(spacing: ASSpacing.sm) {
+                    Button("Conservative") {
+                        motionTrackingManager.applyConservativePreset()
+                    }
+                    .buttonStyle(.bordered)
+                    Button("Balanced") {
+                        motionTrackingManager.applyDefaultPreset()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ASColors.accentFallback)
+                    Button("Responsive") {
+                        motionTrackingManager.applyResponsivePreset()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                MotionTrackingCalibrationView(
+                    headTracking: motionTrackingManager.headTracking,
+                    eyeGaze: motionTrackingManager.eyeGaze
+                )
+            }
+            .padding(ASSpacing.lg)
+            .background(ASColors.chromeBackground)
+        }
+    }
+
+    private var scoreFollowingSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: ASSpacing.lg) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Score Following")
+                            .font(ASTypography.heading2)
+                        Text("Track measure position from the microphone and keep page turns aligned while you play.")
+                            .font(ASTypography.bodySmall)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Done") {
+                        showingScoreFollowingSheet = false
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ASColors.accentFallback)
+                }
+
+                Toggle("Enable Microphone Score Following", isOn: Binding(
+                    get: { scoreFollowingService.isEnabled },
+                    set: { scoreFollowingService.isEnabled = $0 }
+                ))
+                .tint(ASColors.accentFallback)
+
+                VStack(alignment: .leading, spacing: ASSpacing.sm) {
+                    scoreFollowingStatusRow("State", value: scoreFollowingStateLabel)
+                    scoreFollowingStatusRow("Detected Pitch", value: scoreFollowingPitchLabel)
+                    scoreFollowingStatusRow("Estimated Measure", value: "m. \(scoreFollowingService.estimatedMeasure)")
+                    scoreFollowingStatusRow("Measure Progress", value: "\(Int(scoreFollowingService.measureProgress * 100))%")
+                    scoreFollowingStatusRow("Confidence", value: "\(Int(scoreFollowingService.pitchConfidence * 100))%")
+                }
+                .padding(ASSpacing.lg)
+                .background(readerHUDPanel)
+
+                HStack(spacing: ASSpacing.sm) {
+                    Button(scoreFollowingIsRunning ? "Stop Listening" : "Start Listening") {
+                        Task {
+                            if scoreFollowingIsRunning {
+                                scoreFollowingService.stop()
+                            } else {
+                                await scoreFollowingService.start()
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ASColors.accentFallback)
+                    .disabled(normalizedScore == nil || measureMap == nil || !scoreFollowingService.isEnabled)
+
+                    Button("Reset Alignment") {
+                        scoreFollowingService.resetAlignment()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Spacer()
+            }
+            .padding(ASSpacing.lg)
+            .background(ASColors.chromeBackground)
         }
     }
 
@@ -2712,6 +2859,21 @@ public struct ScoreReaderView: View {
         }
     }
 
+    private func configureMotionTracking() {
+        motionTrackingManager.connect(to: pageTurnService)
+        motionTrackingManager.applyDefaultPreset()
+    }
+
+    private func configureScoreFollowing(score: NormalizedScore, measureMap: MeasureMap) {
+        scoreFollowingService.loadScore(score, measureMap: measureMap)
+        scoreFollowingService.onPositionChanged = { measure, _ in
+            autoPageTurn(forMeasure: measure)
+            if playbackEngine.state != .playing {
+                playbackEngine.seek(toMeasure: measure)
+            }
+        }
+    }
+
     private func applyExternalControlProfile() {
         pageTurnService.controlProfile = externalControlProfile
         if externalControlProfile.midiControlEnabled {
@@ -2719,6 +2881,51 @@ public struct ScoreReaderView: View {
         } else {
             midiInputService.stop()
         }
+    }
+
+    private var scoreFollowingIsRunning: Bool {
+        scoreFollowingService.state == .listening || scoreFollowingService.state == .following || scoreFollowingService.state == .lost
+    }
+
+    private var scoreFollowingStateLabel: String {
+        switch scoreFollowingService.state {
+        case .idle: return "Idle"
+        case .listening: return "Listening"
+        case .following: return "Following"
+        case .lost: return "Lost"
+        case .micUnavailable: return "Mic Unavailable"
+        case .permissionDenied: return "Permission Denied"
+        }
+    }
+
+    private var scoreFollowingPitchLabel: String {
+        guard let midiNote = scoreFollowingService.detectedMIDINote else {
+            return scoreFollowingService.detectedFrequency > 0 ? String(format: "%.1f Hz", scoreFollowingService.detectedFrequency) : "Waiting"
+        }
+        return "MIDI \(midiNote)  •  \(String(format: "%.1f Hz", scoreFollowingService.detectedFrequency))"
+    }
+
+    private func scoreFollowingStatusRow(_ title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(ASTypography.body)
+            Spacer()
+            Text(value)
+                .font(ASTypography.monoSmall)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func publishSessionState(pageIndex: Int? = nil) {
+        guard let onSessionStateChanged else { return }
+        let activeSetlistID = setlistItems?.first?.setList?.id
+        onSessionStateChanged(
+            viewModel.score.id,
+            pageIndex ?? viewModel.currentPageIndex,
+            viewModel.displayMode.rawValue,
+            activeSetlistID,
+            currentSetlistIndex
+        )
     }
 
     private func handleTurn(_ direction: PageTurnService.TurnDirection, trigger: PageTurnService.TurnTrigger) {

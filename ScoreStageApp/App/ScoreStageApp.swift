@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import CoreDomain
 import DesignSystem
+import SyncFeature
 
 @main
 struct ScoreStageApp: App {
@@ -9,6 +10,7 @@ struct ScoreStageApp: App {
     @AppStorage(AccountSessionStorage.usernameKey) private var activeAccountUsername = ""
     @State private var showOnboarding = false
     @State private var showLogin = false
+    @State private var handoffService = HandoffService()
 
     var body: some Scene {
         WindowGroup {
@@ -63,6 +65,18 @@ struct ScoreStageApp: App {
                     } else {
                         showLogin = false
                     }
+                }
+                .onContinueUserActivity(HandoffService.ActivityType.viewingScore.rawValue) { activity in
+                    guard let state = handoffService.handleIncomingActivity(activity) else { return }
+                    HandoffSessionStorage.store(state)
+                }
+                .onContinueUserActivity(HandoffService.ActivityType.setlistSession.rawValue) { activity in
+                    guard let state = handoffService.handleIncomingActivity(activity) else { return }
+                    HandoffSessionStorage.store(state)
+                }
+                .onContinueUserActivity(HandoffService.ActivityType.browsing.rawValue) { activity in
+                    guard let state = handoffService.handleIncomingActivity(activity) else { return }
+                    HandoffSessionStorage.store(state)
                 }
         }
         #if os(macOS)

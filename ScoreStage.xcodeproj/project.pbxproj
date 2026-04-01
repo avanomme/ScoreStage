@@ -18,6 +18,7 @@
 		423580C68836CC111D590B4C /* ScoreStageApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F24DE759136043B296DC774 /* ScoreStageApp.swift */; };
 		454CABF06BA43B1F831D91CC /* AccountAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48FA19296652CF24BC2FB4E /* AccountAccess.swift */; };
 		4B325C1B2B39C213E7EB38E4 /* AccountAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48FA19296652CF24BC2FB4E /* AccountAccess.swift */; };
+		4F9C3C8DC974CDD1510D4262 /* HandoffSessionStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7DF2DA420CE486DDC7DA5F /* HandoffSessionStorage.swift */; };
 		577CB981D77F2397B996C260 /* SyncFeature in Frameworks */ = {isa = PBXBuildFile; productRef = ADB558F2B29A153233576609 /* SyncFeature */; };
 		5CDEA5E8E0FDC04DC7076AE7 /* ScoreStageApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F24DE759136043B296DC774 /* ScoreStageApp.swift */; };
 		5F9E9AA68A3CDFF6ECC5F3FE /* SetlistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = B31F5C39D978E876782944C8 /* SetlistFeature */; };
@@ -52,6 +53,7 @@
 		E715E7F5DAFF9B3E6D7E2A7A /* InputTrackingFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 14C5834787FBEEE864C16EA9 /* InputTrackingFeature */; };
 		F818650B2E684C3855318DA3 /* AccountLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4DFE7BBF5C5B675FB8619F /* AccountLoginView.swift */; };
 		F8C735DA53DFFF6D94B3088A /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C803733B8F4FAEAF47BCDF97 /* CoreDomain */; };
+		FA07EC0DDCEFA18297715A54 /* HandoffSessionStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7DF2DA420CE486DDC7DA5F /* HandoffSessionStorage.swift */; };
 		FF36CD4677D93A159FC09564 /* StoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +73,7 @@
 		0B1AF3CA42303AB77DADAD5A /* ScoreStage.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ScoreStage.entitlements; sourceTree = "<group>"; };
 		0E4B73D9BDD8A3E95C66CDE7 /* StoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreService.swift; sourceTree = "<group>"; };
 		1F24DE759136043B296DC774 /* ScoreStageApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreStageApp.swift; sourceTree = "<group>"; };
+		2D7DF2DA420CE486DDC7DA5F /* HandoffSessionStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffSessionStorage.swift; sourceTree = "<group>"; };
 		56C4AD745588633BC44FE669 /* SetlistFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SetlistFeature; path = Packages/SetlistFeature; sourceTree = SOURCE_ROOT; };
 		595BBFE8D25A7F8D2230BDDC /* InputTrackingFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = InputTrackingFeature; path = Packages/InputTrackingFeature; sourceTree = SOURCE_ROOT; };
 		5E5B7285B9693CCD387E6BCE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -171,6 +174,7 @@
 				7185FD5608F6FEB450BF2F5A /* AdminConsoleView.swift */,
 				8C19E309A510733E25407B27 /* AnalyticsService.swift */,
 				CC890328F2B3C396AC4214D4 /* ContentView.swift */,
+				2D7DF2DA420CE486DDC7DA5F /* HandoffSessionStorage.swift */,
 				61CD1E8ED20705E4B8066B3B /* OnboardingView.swift */,
 				AC2AFDECD528BD44B6C834AB /* PaywallView.swift */,
 				1F24DE759136043B296DC774 /* ScoreStageApp.swift */,
@@ -395,6 +399,7 @@
 				23899A3D9AE123B256586333 /* AdminConsoleView.swift in Sources */,
 				DEC8FCE83B1354BFE7A116F9 /* AnalyticsService.swift in Sources */,
 				639671C2C5CBB6E3207A2984 /* ContentView.swift in Sources */,
+				4F9C3C8DC974CDD1510D4262 /* HandoffSessionStorage.swift in Sources */,
 				3523EB753652F366CECD5EFF /* OnboardingView.swift in Sources */,
 				80AD6678CA639845B75E534F /* PaywallView.swift in Sources */,
 				5CDEA5E8E0FDC04DC7076AE7 /* ScoreStageApp.swift in Sources */,
@@ -412,6 +417,7 @@
 				AB5DD579F19C852562E31210 /* AdminConsoleView.swift in Sources */,
 				C64445B0A4903C7455C2F876 /* AnalyticsService.swift in Sources */,
 				A618E7E57AFED287F7969AD5 /* ContentView.swift in Sources */,
+				FA07EC0DDCEFA18297715A54 /* HandoffSessionStorage.swift in Sources */,
 				680F6D97C40CD7463058871A /* OnboardingView.swift in Sources */,
 				7661CF385277261087C4D48B /* PaywallView.swift in Sources */,
 				423580C68836CC111D590B4C /* ScoreStageApp.swift in Sources */,

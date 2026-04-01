@@ -73,5 +73,11 @@
 	<string>ScoreStage uses the camera to scan sheet music and for hands-free page turning via head or eye tracking.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ScoreStage uses the microphone for score-following during practice.</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.scorestage.viewing-score</string>
+		<string>com.scorestage.setlist-session</string>
+		<string>com.scorestage.browsing</string>
+	</array>
 </dict>
 </plist>

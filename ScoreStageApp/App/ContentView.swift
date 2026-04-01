@@ -5,6 +5,7 @@ import LibraryFeature
 import ReaderFeature
 import SetlistFeature
 import CoreDomain
+import SyncFeature
 
 // MARK: - Library Sidebar Navigation
 
@@ -70,8 +71,10 @@ struct ContentView: View {
     @State private var openedSetlistItems: [SetListItem]?
     @State private var openedSetlistIndex: Int?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage(HandoffSessionStorage.pendingStateKey) private var pendingHandoffState = ""
 
     private let importService = ScoreImportService()
+    private let handoffService = HandoffService()
 
     var body: some View {
         Group {
@@ -84,7 +87,8 @@ struct ContentView: View {
                             onClose: closeScore,
                             setlistItems: openedSetlistItems,
                             currentSetlistIndex: openedSetlistIndex,
-                            onNavigateSetlist: navigateSetlistItem
+                            onNavigateSetlist: navigateSetlistItem,
+                            onSessionStateChanged: advertiseReaderSession
                         )
                     .transition(.move(edge: .trailing))
             } else {
@@ -100,10 +104,19 @@ struct ContentView: View {
             }
         }
         .onAppear(perform: seedOwnerAdminIfNeeded)
+        .onAppear(perform: advertiseBrowsing)
+        .onChange(of: pendingHandoffState) { _, newValue in
+            guard !newValue.isEmpty else { return }
+            resumeHandoffSession(from: newValue)
+        }
     }
 
     private func seedOwnerAdminIfNeeded() {
         _ = AccountBootstrap.seedOwnerAccount(in: modelContext)
+    }
+
+    private func advertiseBrowsing() {
+        handoffService.advertiseBrowsing()
     }
 
     // MARK: - Sidebar Layout (iPad / macOS)
@@ -474,6 +487,71 @@ struct ContentView: View {
             openedSetlistItems = nil
             openedSetlistIndex = nil
         }
+        handoffService.advertiseBrowsing()
+    }
+
+    private func advertiseReaderSession(
+        scoreID: UUID,
+        pageIndex: Int,
+        displayMode: String,
+        setlistID: UUID?,
+        setlistItemIndex: Int?
+    ) {
+        if let setlistID, let setlistItemIndex {
+            handoffService.advertiseSetlistSession(
+                setlistID: setlistID,
+                scoreID: scoreID,
+                pageIndex: pageIndex,
+                itemIndex: setlistItemIndex
+            )
+        } else {
+            handoffService.advertiseScoreViewing(
+                scoreID: scoreID,
+                pageIndex: pageIndex,
+                displayMode: displayMode
+            )
+        }
+    }
+
+    private func resumeHandoffSession(from rawValue: String) {
+        guard let state = HandoffSessionStorage.decode(rawValue) else {
+            HandoffSessionStorage.clear()
+            pendingHandoffState = ""
+            return
+        }
+
+        if let setlistID = state.setlistID,
+           let setlist = fetchSetlist(id: setlistID) {
+            let items = setlist.items.sorted { $0.sortOrder < $1.sortOrder }
+            let targetIndex = min(max(state.setlistItemIndex ?? 0, 0), max(items.count - 1, 0))
+            if items.indices.contains(targetIndex), let score = items[targetIndex].score {
+                selectedItem = .setlists
+                openedSetlistItems = items
+                openedSetlistIndex = targetIndex
+                openScore(score)
+            }
+        } else if let scoreID = state.scoreID,
+                  let score = fetchScore(id: scoreID) {
+            selectedItem = .library
+            openScore(score)
+        }
+
+        HandoffSessionStorage.clear()
+        pendingHandoffState = ""
+    }
+
+    private func fetchScore(id: UUID) -> Score? {
+        let descriptor = FetchDescriptor<Score>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchSetlist(id: UUID) -> SetList? {
+        let descriptor = FetchDescriptor<SetList>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
     }
 }
 
