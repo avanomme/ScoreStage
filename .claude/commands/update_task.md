@@ -1,1 +1,0 @@
-# /update_task <id> <status> [note]\n\n## Purpose\nManually update a task status in .claude/tasks.json.\n\n## Rules\n- Cannot mark done if dependencies are not done.\n- blocked requires a note.\n- Append to task history.\n

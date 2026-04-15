@@ -1,1 +1,0 @@
-# /compact — Session Context Summary\n\n## Purpose\nSummarize what changed in this session and append to docs/internal/progress.md.\n

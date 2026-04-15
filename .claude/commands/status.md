@@ -1,1 +1,0 @@
-# /status — Project Dashboard\n\n## Purpose\nSummarize tasks by status and show blockers and completion %.\n

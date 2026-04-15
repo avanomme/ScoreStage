@@ -1,1 +1,0 @@
-# /next_task — Implement all tasks in Order in the Next Phase k\n\n## Purpose\nPick the next todo task with all dependencies done, implement it, test it, then mark it done. Then continue with remaining tasks in order until Phase is compelted.\n\n## Guardrails\n- Keep patches small and focused.\n- Add/adjust tests where applicable.\n
